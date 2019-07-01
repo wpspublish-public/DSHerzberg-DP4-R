@@ -11,96 +11,74 @@ suppressMessages(suppressWarnings(library(tidyverse)))
 suppressMessages(library(ggpmisc)) # EXTENSIONS TO ggplot2: ADD EQUATIONS AND FIT STATISTICS TO FITTED LINE PLOTS
 library(ggrepel) # MORE ggplot2 EXTENSIONS
 
-# cat("Enter the name of the input file, including the .csv suffix.\nUse exact spelling and capitalization.")
-# input_file_name <-
-#   suppressWarnings(as.character(
-#     readline(prompt = "Input file: ")
-#   ))
-# cat("\nEnter the column name of the score to be normed.\nUse exact spelling and capitalization.")
-# score_name <-
-#   suppressWarnings(as.character(
-#     readline(prompt = "Score name: ")
-#   ))
-# cat("\nEnter the HIGHEST possible raw score for the score to be normed.")
-# max_raw <-
-#   suppressWarnings(as.integer(
-#     readline(prompt = "Maximum raw score: ")
-#   ))
-# cat("\nEnter the LOWEST possible raw score for the score to be normed.")
-# min_raw <-
-#   suppressWarnings(as.integer(
-#     readline(prompt = "Minimum raw score: ")
-#   ))
+input_parameters_prompt <- function() {
+  writeLines(
+    "To initiate the norming process, R requires certain input parameters. Please choose a method for entering these parameters:\n\n1: Interactively at the console\n2: From a file named 'Input-Parameters.R' located in '[PROJECT DIRECTORY]/INPUT-FILES'\n"
+  )
+  input_choice <- as.numeric(0)
+  while (is.na(input_choice) || (!(input_choice %in% 1:2))) {
+    input_choice <-
+      suppressWarnings(as.numeric(readline(prompt = "Enter choice: ")))
+    if (is.na(input_choice)) {
+      writeLines("Please enter 1 or 2\n")
+    } else {
+      if (input_choice == 1) {
+        cat("Enter the name of the input file, including the .csv suffix.\nUse exact spelling and capitalization.")
+        suppressWarnings(as.character(
+          readline(prompt = "Input file: ")
+        )) %>% assign('input_file_name', ., envir = .GlobalEnv)
+        cat("\nEnter the column name of the score to be normed.\nUse exact spelling and capitalization.")
+        suppressWarnings(as.character(
+          readline(prompt = "Score name: ")
+        )) %>% assign('score_name', ., envir = .GlobalEnv)
+        cat("\nEnter the HIGHEST possible raw score for the score to be normed.")
+        suppressWarnings(as.integer(
+          readline(prompt = "Maximum raw score: ")
+        )) %>% assign('max_raw', ., envir = .GlobalEnv)
+        cat("\nEnter the LOWEST possible raw score for the score to be normed.")
+        suppressWarnings(as.integer(
+          readline(prompt = "Minimum raw score: ")
+        )) %>% assign('min_raw', ., envir = .GlobalEnv)
+        break
+      } else if (input_choice == 2) {
+        source(here('INPUT-FILES/Input-Parameters.R'))
+        break
+      } else {
+        writeLines("Please enter 1 or 2\n")
+      }
+    }
+  }
+}
+input_parameters_prompt()
 
-
-# REMOVE THESE VECTORS AFTER INTERACTIVE FEATURES ARE IN PLACE.
-input_file_name <- c('DP4-Interview-TOTALscore.csv')
-score_name <- c('TOTALSCORE')
-max_raw <- 
-min_raw <- 
-  
-  suppressMessages(
-    read_csv(
-      here(
-        paste0('INPUT-FILES/', input_file_name)
-        )
-      )
-    ) %>% 
-  mutate_at(
-    vars(
-      agestrat
-    ), ~ case_when(
-      .x == 5.0 ~ 60,
-      .x == 5.3 ~ 63,
-      .x == 5.6 ~ 66,
-      .x == 5.9 ~ 69,
-      .x == 6.0 ~ 72,
-      .x == 6.3 ~ 75,
-      .x == 6.6 ~ 78,
-      .x == 6.9 ~ 81,
-      .x == 7.0 ~ 84,
-      .x == 7.3 ~ 87,
-      .x == 7.6 ~ 90,
-      .x == 7.9 ~ 93,
-      .x == 8.0 ~ 96,
-      .x == 8.6 ~ 102,
-      .x == 9.0 ~ 108,
-      .x == 9.6 ~ 114,
-      .x == 10.0 ~ 120,
-      .x == 10.6 ~ 126,
-      .x == 11.0 ~ 132,
-      .x == 11.6 ~ 138,
-      .x == 12.0 ~ 144,
-      .x == 12.6 ~ 150,
-      .x == 13.0 ~ 156,
-      .x == 14.0 ~ 168,
-      .x == 15.0 ~ 180,
-      .x == 1618.0 ~ 192,
-      .x == 1921.0 ~ 228,
-      TRUE ~ NA_real_
+suppressMessages(
+  read_csv(
+    here(
+      paste0('INPUT-FILES/', input_file_name)
     )
-  ) %>% 
+  )
+) %>% 
   group_by(agestrat) %>% 
-    assign(paste0(score_name, '_raw_by_agestrat'), ., envir = .GlobalEnv)
-num_agestrat <- length(unique(ANT_total_raw_by_agestrat$agestrat))
+  assign(paste0(score_name, '_raw_by_agestrat'), ., envir = .GlobalEnv)
+num_agestrat <- length(unique(eval(as.name(paste0(score_name, '_raw_by_agestrat')))$agestrat))
 #$$$$$$$$$$$
-  
+
 eval(as.name(paste0(score_name, '_raw_by_agestrat'))) %>% count(!!as.name(score_name)) %>% 
   mutate(perc = round(100*(n/sum(n)), 4), cum_per = round(100*(cumsum(n)/sum(n)), 4), lag_tot = lag(!!as.name(score_name)), lag_cum_per = lag(cum_per)) %>% 
   assign(paste0(score_name, '_freq_agestrat'), ., envir = .GlobalEnv)
 
 eval(as.name(paste0(score_name, '_raw_by_agestrat'))) %>% arrange(agestrat) %>% summarise(n = n(),
-                                                         median = round(median(eval(as.name(score_name))), 2),
-                                                         mean = round(mean(eval(as.name(score_name))), 2),
-                                                         sd = round(sd(eval(as.name(score_name))), 2)) %>%
+                                                                                          median = round(median(eval(as.name(score_name))), 2),
+                                                                                          mean = round(mean(eval(as.name(score_name))), 2),
+                                                                                          sd = round(sd(eval(as.name(score_name))), 2)) %>%
   mutate(ES = round((mean - lag(mean))/((sd + lag(sd))/2),2), group = c(1:num_agestrat)) %>% 
   assign(paste0(score_name, '_desc_agestrat'), ., envir = .GlobalEnv)
 
 agestrat <- eval(as.name(paste0(score_name, '_desc_agestrat'))) %>% pull(agestrat)
 max_mean <- max(eval(as.name(paste0(score_name, '_desc_agestrat')))$mean)
 max_SD <- max(eval(as.name(paste0(score_name, '_desc_agestrat')))$sd)
-scale_y_break_options <- seq(0, 100, 5)
-scale_y_ceiling_mean <- scale_y_break_options[which.min(abs(scale_y_break_options - (max_mean+max_SD)))]
+scale_y_break_options <- seq(0, max_mean+(2*max_SD), 5)
+scale_y_ceiling_mean <- scale_y_break_options[which.min(abs(scale_y_break_options - (max_mean+(2*max_SD))))]
 scale_y_ceiling_SD <- scale_y_break_options[which.min(abs(scale_y_break_options - (max_SD+(max_SD/2))))]
 
 # Create Z score table
@@ -140,14 +118,15 @@ mean_plot <- ggplot(data = eval(as.name(paste0(score_name, '_desc_agestrat'))), 
     width = 0.2
   ) 
 print(mean_plot)
+eval(as.name(paste0(score_name, '_desc_agestrat'))) %>% print(n = nrow(.))
 #$$$$$$$$$$$
 
 mean_plot_prompt <- function() {
   writeLines(c("\n", 
-    strrep("\u2500", 80),
-    "Examine plot of raw score means and SDs.",
-    "Then press [enter] to continue.",
-    strrep("\u2500", 80)
+               strrep("\u2500", 80),
+               "Examine descriptives (above); graph of raw score means, SDs (plot pane on right).",
+               "Then press [enter] to continue.",
+               strrep("\u2500", 80)
   ))
   readline()
 }
@@ -200,22 +179,22 @@ mean_plot_prompt ()
 #   print(sd_plot)
 
 # Generate table of lo1, lo2, hi1, hi2 SD adjustment points by agestrat
-  full_join(
-    eval(as.name(paste0(score_name, '_freq_agestrat'))),
-    (
-      eval(as.name(paste0(score_name, '_freq_agestrat'))) %>%
-        group_by(agestrat) %>%
-        summarise(min = min(cum_per)) %>%
-        mutate(lo1 = case_when(
-          min < 5 ~ 5,
-          min < 10 ~ 10,
-          min < 15 ~ 15,
-          min < 20 ~ 20,
-          TRUE ~ 25
-        ))
-    ),
-    by = 'agestrat'
-  ) %>%
+full_join(
+  eval(as.name(paste0(score_name, '_freq_agestrat'))),
+  (
+    eval(as.name(paste0(score_name, '_freq_agestrat'))) %>%
+      group_by(agestrat) %>%
+      summarise(min = min(cum_per)) %>%
+      mutate(lo1 = case_when(
+        min < 5 ~ 5,
+        min < 10 ~ 10,
+        min < 15 ~ 15,
+        min < 20 ~ 20,
+        TRUE ~ 25
+      ))
+  ),
+  by = 'agestrat'
+) %>%
   group_by(agestrat) %>% mutate(flag = case_when(cum_per > lo1 &
                                                    cum_per < 95 ~ 1,
                                                  TRUE ~ 0)) %>% filter(flag == 1) %>% summarise(min = min(cum_per),
@@ -267,9 +246,6 @@ norm_perc_prompt ()
 # contain the correct IRS values for each distribution point (note how ties are
 # handled <= cum_per). Drop all rows containing missing values, such that
 # remaining rows are only those that contain the five IRS for each agestrat.
-# Then collapse IRS values into a single row, with the correct IRS paired with
-# its dist_point label. Use left_join to look up Z-scores for distribution
-# points. Drop columns no longer needed.
 
 norm_build1 <-
   eval(as.name(paste0(score_name, '_freq_agestrat'))) %>% 
@@ -296,33 +272,75 @@ norm_build1 <-
         hi2 > lag_cum_per ~ 'hi2',
       TRUE ~ NA_character_
     )
-  ) %>% drop_na() %>% mutate(IRS = case_when(dist_point == 'lo1' ~ IRS_lo1,
-                                                             dist_point == 'lo2' ~ IRS_lo2,
-                                                             dist_point == 'med' ~ IRS_med,
-                                                             dist_point == 'hi1' ~ IRS_hi1,
-                                                             dist_point == 'hi2' ~ IRS_hi2,
-                                                             TRUE ~ NA_real_),
-                                             RSD = case_when(dist_point == 'lo1' ~ lead(lead(IRS))-IRS,
-                                                             dist_point == 'lo2' ~ lead(IRS)-IRS,
-                                                             dist_point == 'med' ~ IRS,
-                                                             dist_point == 'hi1' ~ IRS-lag(IRS),
-                                                             dist_point == 'hi2' ~ IRS-lag(lag(IRS)),
-                                                             TRUE ~ NA_real_),
-                                             lohi_value = case_when(dist_point == 'lo1' ~ lo1,
-                                                             dist_point == 'lo2' ~ lo2,
-                                                             dist_point == 'hi1' ~ hi1,
-                                                             dist_point == 'hi2' ~ hi2,
-                                                             TRUE ~ 50)) %>% 
+  ) %>% drop_na() 
+
+# Next code deals with situation where upper age ranges are ceilinged out on the
+# score being normed, such that the code to this points doesn't generate hi2
+# and/or hi1 dist_points or IRS for those upper ranges. Next section imputes new rows
+# for hi1, hi2 (in agestrats where they are missing), and copies in nearest
+# values for the remaining columns.
+
+df_interim <- norm_build1 %>% ungroup() %>% 
+  mutate(
+    dist_point = case_when(
+      dist_point == 'lo1' ~ 'A',
+      dist_point == 'lo2' ~ 'B',
+      dist_point == 'med' ~ 'C',
+      dist_point == 'hi1' ~ 'D',
+      dist_point == 'hi2' ~ 'E',
+      TRUE ~ NA_character_
+    )
+  ) %>% complete(
+  agestrat, dist_point
+  ) %>%
+  fill(
+    !!as.name(score_name):IRS_hi2
+  ) %>% 
+  mutate(
+    dist_point = case_when(
+      dist_point == 'A' ~ 'lo1',
+      dist_point == 'B' ~ 'lo2',
+      dist_point == 'C' ~ 'med',
+      dist_point == 'D' ~ 'hi1',
+      dist_point == 'E' ~ 'hi2',
+      TRUE ~ NA_character_
+    )
+  ) %>% group_by(agestrat)
+rm(norm_build1)
+
+# Now collapse IRS values into a single row, with the correct IRS paired with
+# its dist_point label. Use left_join to look up Z-scores for distribution
+# points. Drop columns no longer needed.
+
+norm_build1 <- df_interim %>% mutate(
+  IRS = case_when(dist_point == 'lo1' ~ IRS_lo1,
+                                             dist_point == 'lo2' ~ IRS_lo2,
+                                             dist_point == 'med' ~ IRS_med,
+                                             dist_point == 'hi1' ~ IRS_hi1,
+                                             dist_point == 'hi2' ~ IRS_hi2,
+                                             TRUE ~ NA_real_),
+                             RSD = case_when(dist_point == 'lo1' ~ lead(lead(IRS))-IRS,
+                                             dist_point == 'lo2' ~ lead(IRS)-IRS,
+                                             dist_point == 'med' ~ IRS,
+                                             dist_point == 'hi1' ~ IRS-lag(IRS),
+                                             dist_point == 'hi2' ~ IRS-lag(lag(IRS)),
+                                             TRUE ~ NA_real_),
+                             lohi_value = case_when(dist_point == 'lo1' ~ lo1,
+                                                    dist_point == 'lo2' ~ lo2,
+                                                    dist_point == 'hi1' ~ hi1,
+                                                    dist_point == 'hi2' ~ hi2,
+                                                    TRUE ~ 50)) %>% 
   select(agestrat, lo1, lo2, hi1, hi2, dist_point, lohi_value, IRS, RSD) %>% left_join(perc_z, by = 'lohi_value') %>% 
   mutate(std_RSD = RSD/z_score, SD = case_when(dist_point == 'lo1' | dist_point == 'hi1' ~ (std_RSD+lead(std_RSD))/2,
-                                                                                            TRUE ~ NA_real_),
+                                               TRUE ~ NA_real_),
          median = case_when(dist_point == 'med' ~ IRS,
                             TRUE ~ NA_real_),
          lo_SD = case_when(dist_point == 'lo1' ~ SD,
                            TRUE ~ NA_real_),
          hi_SD = case_when(dist_point == 'hi1' ~ SD,
                            TRUE ~ NA_real_))
-    
+rm(df_interim)
+
 # Get summary table
 norm_build_med_hilo_sum <-
   norm_build1 %>% summarise(
@@ -491,7 +509,7 @@ lo_SD_1st_plot <-
     parse = TRUE
   )
 
-mean_lo_SD <- round(mean(norm_build_med_hilo_sum$lo_SD), 2)
+mean_lo_SD <- round(mean(norm_build_med_hilo_sum$lo_SD, na.rm = TRUE), 2)
 lo_SD_mean_plot <-
   ggplot(norm_build_med_hilo_sum, aes(x = group, y = lo_SD)) +
   geom_point(
@@ -582,7 +600,7 @@ hi_SD_1st_plot <-
     parse = TRUE
   )
 
-mean_hi_SD <- round(mean(norm_build_med_hilo_sum$hi_SD), 2)
+mean_hi_SD <- round(mean(norm_build_med_hilo_sum$hi_SD, na.rm = TRUE), 2)
 hi_SD_mean_plot <-
   ggplot(norm_build_med_hilo_sum, aes(x = group, y = hi_SD)) +
   geom_point(
@@ -693,7 +711,7 @@ smooth_plot <- ggplot(data = smooth_med_SD, aes(group, median_sm)) +
     size = 3,
     shape = 23
   ) +
-  geom_label_repel(aes(label = median_sm), hjust = .7, vjust = -1, label.padding = unit(0.1, "lines"), size = 4, col = "blue") +
+  geom_label_repel(aes(label = round(median_sm, 2)), hjust = .7, vjust = -1, label.padding = unit(0.1, "lines"), size = 4, col = "blue") +
   scale_x_continuous(breaks = seq(1, num_agestrat, 1), labels = agestrat) +
   scale_y_continuous(breaks = seq(0, scale_y_ceiling_mean, 5), limits = c(0, scale_y_ceiling_mean)) +
   labs(title = "Smoothed Medians, lo_SDs, hi_SDs", x = "Agestrat", y = "Total Score") +
@@ -719,10 +737,10 @@ smooth_plot_prompt ()
 print(mean_plot)
 mean_plot_compare_prompt <- function() {
   writeLines(c( 
-               strrep("\u2500", 80),
-               "Using arrow button, compare smoothed plot to plot of raw score means and SDs.",
-               "Then press [enter] to continue.",
-               strrep("\u2500", 80)
+    strrep("\u2500", 80),
+    "Using arrow button, compare smoothed plot to plot of raw score means and SDs.",
+    "Then press [enter] to continue.",
+    strrep("\u2500", 80)
   ))
   readline()
 }
@@ -874,113 +892,135 @@ smooth_med_SD_fun()
 
 # process lo_SD score reversals
 lo_SD_hand_smooth_prompt <- function() {
-  writeLines("\nChoose row in which you want to modify lo_SD_sm.")
-  lo_SD_hand_smooth_row_choice <- as.numeric(0)
-  while (is.na(lo_SD_hand_smooth_row_choice) ||
-         (!(lo_SD_hand_smooth_row_choice %in% 1:nrow(smooth_med_SD)))) {
-    lo_SD_hand_smooth_row_choice <-
-      suppressWarnings(as.numeric(readline(prompt = "Enter row number: ")))
-    if (lo_SD_hand_smooth_row_choice %in% 1:nrow(smooth_med_SD))
-    {
-      lo_SD_new_value <- as.numeric(0)
-      while (is.na(lo_SD_new_value) ||
-             (!(lo_SD_new_value > 0 && lo_SD_new_value < 100))) {
-        lo_SD_new_value <-
-          suppressWarnings(as.numeric(
-            readline(prompt = "Enter new value (between 0 and 100) for lo_SD_sm: ")
-          ))
-        smooth_med_SD %>%
-          mutate_at(
-            vars(lo_SD_sm),
-            ~ case_when(
-              group == lo_SD_hand_smooth_row_choice ~ lo_SD_new_value,
-              TRUE ~ .x
-            )
-          ) %>%
-          assign('smooth_med_SD', ., envir = .GlobalEnv)
-      }
-      smooth_med_SD_fun()
-      writeLines(
-        "\nExamine table above to see effect of adjusted lo_SD_sm on value of diff_minus_2SD in same row.
-        \nDo you want to modify lo_SD_sm in another row?"
-      )
-      modify_again <- as.character('x')
-      while (is.na(modify_again) ||
-             (!(
-               modify_again %in% c('Y', 'y', 'Yes', 'yes', 'N', 'n', 'No', 'no')
-             ))) {
-        modify_again <-
-          suppressWarnings(as.character(readline(prompt = "Enter Y or N: ")))
-      }
-      if (modify_again %in% c('N', 'n', 'No', 'no')) {
-        if (any(na.omit(smooth_med_SD$diff_plus_2SD) < 0)) {
+  writeLines("\nDo you want to adjust lo_SD_sm (standard deviation BELOW the smoothed median)?")
+  repeat {
+    adjust_lo <-
+      suppressWarnings(as.character(readline(prompt = "Enter Y or N: ")))
+    if (adjust_lo %in% c('Y', 'y', 'Yes', 'yes')) {
+      writeLines("\nChoose row in which you want to adjust lo_SD_sm.")
+      repeat {
+        lo_SD_hand_smooth_row_choice <-
+          suppressWarnings(as.numeric(readline(prompt = "Enter row number: ")))
+        if (lo_SD_hand_smooth_row_choice %in% 1:nrow(smooth_med_SD))
+        {
+          lo_SD_new_value <- as.numeric(0)
+          while (is.na(lo_SD_new_value) ||
+                 (!(lo_SD_new_value > 0 &&
+                    lo_SD_new_value < 100))) {
+            lo_SD_new_value <-
+              suppressWarnings(as.numeric(
+                readline(prompt = "Enter new value (between 0 and 100) for lo_SD_sm: ")
+              ))
+            smooth_med_SD %>%
+              mutate_at(
+                vars(lo_SD_sm),
+                ~ case_when(
+                  group == lo_SD_hand_smooth_row_choice ~ lo_SD_new_value,
+                  TRUE ~ .x
+                )
+              ) %>%
+              assign('smooth_med_SD', ., envir = .GlobalEnv)
+          }
+          smooth_med_SD_fun()
           writeLines(
-            '\nR found score reversals, between age groups, at 2 SD above imputed median (see negative values for diff_plus_2SD in table printed above).
-            \nPress [Enter] to correct reversals by manually adjusting hi_SD_sms.'
+            "\nExamine table above to see effect of adjusted lo_SD_sm on value of diff_minus_2SD in same row.
+            \nDo you want to adjust lo_SD_sm in another row?"
           )
-          readline()
-          hi_SD_hand_smooth_prompt()
-        } else {
-          writeLines('\nPress [Enter] to generate standard-score look-up tables.')
-          invisible(readline())
-          break
+          repeat {
+            adjust_again <-
+              suppressWarnings(as.character(readline(prompt = "Enter Y or N: ")))
+            if (adjust_again %in% c('Y', 'y', 'Yes', 'yes')) {
+              break
+              # break exits one level of nested loops
+            }
+            else if (adjust_again %in% c('N', 'n', 'No', 'no')) {
+              # return() exits all nested loops
+              return()
+            }
+          }
         }
-      } else if (modify_again %in% c('Y', 'y', 'Yes', 'yes')) {
-        lo_SD_hand_smooth_row_choice <- NA
-      }
+    }
+    } else if (adjust_lo %in% c('N', 'n', 'No', 'no')) {
+      break
     }
   }
-}
+  }
 
 # process hi_SD score reversals
 hi_SD_hand_smooth_prompt <- function() {
-  writeLines("\nChoose row in which you want to modify hi_SD_sm.")
-  hi_SD_hand_smooth_row_choice <- as.numeric(0)
-  while (is.na(hi_SD_hand_smooth_row_choice) ||
-         (!(hi_SD_hand_smooth_row_choice %in% 1:nrow(smooth_med_SD)))) {
-    hi_SD_hand_smooth_row_choice <-
-      suppressWarnings(as.numeric(readline(prompt = "Enter row number: ")))
-    if (hi_SD_hand_smooth_row_choice %in% 1:nrow(smooth_med_SD))
-    {
-      hi_SD_new_value <- as.numeric(0)
-      while (is.na(hi_SD_new_value) ||
-             (!(hi_SD_new_value > 0 &&
-                hi_SD_new_value < 100))) {
-        hi_SD_new_value <-
-          suppressWarnings(as.numeric(
-            readline(prompt = "Enter new value (between 0 and 100) for hi_SD_sm: ")
-          ))
-        smooth_med_SD %>%
-          mutate_at(
-            vars(hi_SD_sm),
-            ~ case_when(
-              group == hi_SD_hand_smooth_row_choice ~ hi_SD_new_value,
-              TRUE ~ .x
-            )
-          ) %>%
-          assign('smooth_med_SD', ., envir = .GlobalEnv)
-      }
-      smooth_med_SD_fun()
-      writeLines(
-        "\nExamine table above to see effect of adjusted hi_SD_sm on value of diff_plus_2SD in same row.
-        \nDo you want to modify hi_SD_sm in another row?"
-      )
-      modify_again <- as.character('x')
-      while (is.na(modify_again) ||
-             (!(
-               modify_again %in% c('Y', 'y', 'Yes', 'yes', 'N', 'n', 'No', 'no')
-             ))) {
-        modify_again <-
-          suppressWarnings(as.character(readline(prompt = "Enter Y or N: ")))
-      }
-      if (modify_again %in% c('N', 'n', 'No', 'no')) {
-        writeLines(
-          '\nPress [Enter] to generate standard-score look-up tables.'
-        )
-        invisible(readline())
+  writeLines("\nDo you want to adjust hi_SD_sm (standard deviation ABOVE the smoothed median)?")
+  repeat {
+    adjust_hi <-
+      suppressWarnings(as.character(readline(prompt = "Enter Y or N: ")))
+    if (adjust_hi %in% c('Y', 'y', 'Yes', 'yes')) {
+      writeLines("\nChoose row in which you want to adjust hi_SD_sm.")
+      repeat {
+        hi_SD_hand_smooth_row_choice <-
+          suppressWarnings(as.numeric(readline(prompt = "Enter row number: ")))
+        if (hi_SD_hand_smooth_row_choice %in% 1:nrow(smooth_med_SD))
+        {
+          hi_SD_new_value <- as.numeric(0)
+          while (is.na(hi_SD_new_value) ||
+                 (!(hi_SD_new_value > 0 &&
+                    hi_SD_new_value < 100))) {
+            hi_SD_new_value <-
+              suppressWarnings(as.numeric(
+                readline(prompt = "Enter new value (between 0 and 100) for hi_SD_sm: ")
+              ))
+            smooth_med_SD %>%
+              mutate_at(
+                vars(hi_SD_sm),
+                ~ case_when(
+                  group == hi_SD_hand_smooth_row_choice ~ hi_SD_new_value,
+                  TRUE ~ .x
+                )
+              ) %>%
+              assign('smooth_med_SD', ., envir = .GlobalEnv)
+          }
+          smooth_med_SD_fun()
+          writeLines(
+            "\nExamine table above to see effect of adjusted hi_SD_sm on value of diff_minus_2SD in same row.
+            \nDo you want to adjust hi_SD_sm in another row?"
+          )
+          repeat {
+            adjust_again <-
+              suppressWarnings(as.character(readline(prompt = "Enter Y or N: ")))
+            if (adjust_again %in% c('Y', 'y', 'Yes', 'yes')) {
+              break
+              # break exits one level of nested hiops
+            }
+            else if (adjust_again %in% c('N', 'n', 'No', 'no')) {
+              # return() exits all nested hiops
+              return()
+            }
+          }
+        }
+    }
+    } else if (adjust_hi %in% c('N', 'n', 'No', 'no')) {
+      break
+    }
+  }
+  }
+
+
+# create function to choose to adjust SDs by hand.
+hand_smooth_choice_fun <- function() {
+  hand_smooth_choice <- as.numeric(0)
+  while (is.na(hand_smooth_choice) ||
+         (!(hand_smooth_choice %in% 1:2))) {
+    hand_smooth_choice <-
+      suppressWarnings(as.numeric(readline(prompt = "Enter choice: ")))
+    if (is.na(hand_smooth_choice)) {
+      writeLines("\nPlease enter 1 or 2")
+    } else {
+      if (hand_smooth_choice == 1) {
         break
-      } else if (modify_again %in% c('Y', 'y', 'Yes', 'yes')) {
-        hi_SD_hand_smooth_row_choice <- NA
+      } else if (hand_smooth_choice == 2) {
+        lo_SD_hand_smooth_prompt()
+        hi_SD_hand_smooth_prompt()
+        break
+      } else {
+        writeLines("\nPlease enter 1 or 2")
       }
     }
   }
@@ -990,25 +1030,38 @@ hi_SD_hand_smooth_prompt <- function() {
 if (!any(na.omit(smooth_med_SD$diff_minus_2SD) < 0) &&
     !any(na.omit(smooth_med_SD$diff_plus_2SD) < 0)) {
   writeLines(
-    '\nR found no score reversals, going from one age group to the next, at either 2 SD above or 2 SD below the imputed median.
-    \nPress [Enter] to generate standard-score look-up tables.'
+    "\nR found no score reversals, going from one age group to the next, at either 2 SD above or 2 SD below the imputed median.
+    \nChoose next step:\n\n1: Proceed without adjusting SDs\n2: Make manual adjustments to SDs"
   )
-  invisible(readline())
-} else if (any(na.omit(smooth_med_SD$diff_minus_2SD) < 0)) {
+  hand_smooth_choice_fun()
+} else if (any(na.omit(smooth_med_SD$diff_minus_2SD) < 0) &&
+           !any(na.omit(smooth_med_SD$diff_plus_2SD) < 0)) {
   writeLines(
     '\nR found score reversals, between age groups, at 2 SD below imputed median (see negative values for diff_minus_2SD in table printed above).
-    \nPress [Enter] to correct reversals by manually adjusting lo_SD_sm.'
+    \nChoose next step:\n\n1: Proceed without adjusting SDs\n2: Make manual adjustments to SDs'
   )
-  readline()
-  lo_SD_hand_smooth_prompt()
-} else if (any(na.omit(smooth_med_SD$diff_plus_2SD) < 0)) {
+  hand_smooth_choice_fun()
+} else if (!any(na.omit(smooth_med_SD$diff_minus_2SD) < 0) &&
+           any(na.omit(smooth_med_SD$diff_plus_2SD) < 0)) {
   writeLines(
     '\nR found score reversals, between age groups, at 2 SD above imputed median (see negative values for diff_plus_2SD in table printed above).
-    \nPress [Enter] to correct reversals by manually adjusting hi_SD_sm.'
+    \nChoose next step:\n\n1: Proceed without adjusting SDs\n2: Make manual adjustments to SDs'
   )
-  readline()
-  hi_SD_hand_smooth_prompt()
+  hand_smooth_choice_fun()
+} else if (any(na.omit(smooth_med_SD$diff_minus_2SD) < 0) &&
+           any(na.omit(smooth_med_SD$diff_plus_2SD) < 0)) {
+  writeLines(
+    '\nR found score reversals, between age groups, at both 2 SD above and 2 SD below imputed median (see negative values for diff_minus_2SD, diff_plus_2SD in table printed above).
+    \nChoose next step:\n\n1: Proceed without adjusting SDs\n2: Make manual adjustments to SDs'
+  )
+  hand_smooth_choice_fun()
 }
+
+writeLines(
+  '\nPress [Enter] to generate standard-score look-up tables.'
+)
+invisible(readline())
+
 
 # Clean up environment
 rm(list = ls()[!ls() %in% c("smooth_med_SD", "score_name", "num_agestrat", "max_raw", "min_raw", 
@@ -1069,64 +1122,6 @@ rm(raw_to_SS_lookup_empty, final_med_SD, smooth_med_SD)
 # write final raw-to-SS lookup table to .csv
 write_csv(
   raw_to_SS_lookup, here(
-            paste0('OUTPUT-FILES/FINAL-RAW-TO-SS-LOOKUP-TABLES/', score_name, '-raw-SS-lookup.csv')
+    paste0('OUTPUT-FILES/', score_name, '-raw-SS-lookup.csv')
   )
 )
-
-# # next code section combines R raw-to-SS lookup with SPSS raw-to-SS lookup, in a
-# # format that can be used in Excel to compare results of the two methods.
-# 
-# # names for calculated columns
-# calc_cols <- c(paste0("calc_", 1:num_agestrat))
-# 
-# # df containing empty calc columns that can be joined to other tables.
-# calc_cols_df <- bind_cols(
-#   enframe(min_raw:max_raw, name = NULL, value = 'rawscore'),
-#   data.frame(matrix(NA_real_, nrow = max_raw + 1, ncol = num_agestrat)) %>%
-#     set_colnames(calc_cols)
-# )
-# 
-# # create list containing three tables to join: R raw-SS-lookup, SPSS
-# # raw-SS-lookup, and empty columns for calculation.
-# tables_to_join <- list(raw_to_SS_lookup,
-#                        suppressMessages(read_csv(
-#                          here(
-#                            'CASL-2 COMPS/RAW-TO-SS-LOOKUP-TABLES-SPSS/SPSS-LOOKUPS/RV-Age-Norms-Raw-to-SS-from-SPSS.csv'
-#                          )
-#                        )),
-#                        calc_cols_df
-# )
-# 
-# # `purrr::reduce` can be used to apply `left_join` to a list of tables that share a `by` variable
-# R_SPSS_comps_table <- tables_to_join %>%
-#   reduce(
-#     left_join, by = 'rawscore'
-#   ) %>%
-#   select(
-#     rawscore, mo_36, a0300, calc_1, mo_39, a0330, calc_2, mo_42, a0360, calc_3, mo_45, a0390,
-#     calc_4, mo_48, a0400, calc_5, mo_51, a0430, calc_6, mo_54, a0460, calc_7, mo_57, a0490,
-#     calc_8, mo_60, a0500, calc_9, mo_63, a0530, calc_10, mo_66, a0560, calc_11, mo_69, a0590,
-#     calc_12, mo_72, a0600, calc_13, mo_75, a0630, calc_14, mo_78, a0660, calc_15, mo_81,
-#     a0690, calc_16, mo_84, a0700, calc_17, mo_87, a0730, calc_18, mo_90, a0760, calc_19,
-#     mo_93, a0790, calc_20, mo_96, a0800, calc_21, mo_102, a0860, calc_22, mo_108, a0900,
-#     calc_23, mo_114, a0960, calc_24, mo_120, a1000, calc_25, mo_126, a1060, calc_26, mo_132,
-#     a1100, calc_27, mo_138, a1160, calc_28, mo_144, a1200, calc_29, mo_150, a1260, calc_30,
-#     mo_156, a1300, calc_31, mo_168, a1400, calc_32, mo_180, a1500, calc_33, mo_192, a1618,
-#     calc_34, mo_228, a1921, calc_35
-#   )
-# 
-# # gets an integer vector containing position numbers of columns needing calculation
-# calc_cols_pos <- which(startsWith(names(R_SPSS_comps_table), "calc"))
-# 
-# # do the calculation on cols via simple assignment. Within single brackets,
-# # position numbers can be added and subtracted to refer to leading and lagging columns.
-# R_SPSS_comps_table[calc_cols_pos] <-
-#   abs(R_SPSS_comps_table[calc_cols_pos - 1] - R_SPSS_comps_table[calc_cols_pos - 2])
-# 
-# # write table for doing SS comps in excel
-# write_csv(R_SPSS_comps_table,
-#           here('CASL-2 COMPS/RAW-TO-SS-LOOKUP-TABLES-SPSS/COMPS/RV-R-SPSS-SS-comps.csv'
-#           )
-# )
-
-
