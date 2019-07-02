@@ -667,7 +667,30 @@ smooth_med_SD <-
   cbind(norm_build_med_hilo_sum, median_sm, lo_SD_sm, hi_SD_sm) %>% dplyr::select(-(lo1:hi2)) %>%
   mutate(ES_sm = round((median_sm - lag(median_sm)) / ((
     lo_SD_sm + lag(lo_SD_sm) + hi_SD_sm + lag(hi_SD_sm)
-  ) / 4), 3))
+  ) / 4), 3)) %>% 
+# truncate possible values of median_sm at min_raw, max_raw.
+mutate_at(
+  vars(median_sm), ~ case_when(
+    .x < min_raw ~ min_raw,
+    .x > max_raw ~ max_raw,
+    TRUE ~ .x
+  )
+) %>% 
+# Ensure that median_sm is never less than its lagging value, or greater than
+# its leading value. This must be done in separate tests, to ensure that the
+# corrections don't cancel each other out, or reverse each other.
+mutate_at(
+  vars(median_sm), ~ case_when(
+    .x < lag(.x) ~ lag(.x),
+    TRUE ~ .x
+  )
+) %>% 
+mutate_at(
+  vars(median_sm), ~ case_when(
+    .x > lead(.x) ~ lead(.x),
+    TRUE ~ .x
+    )
+  )
 
 # PROMPT TO INSPECT PLOT SMOOTHED MEDIANS VS. IMPUTED MEDIANS VS RAW SCORE MEDIANS.
 # NOTE: CODE BELOW NOT PROPIGATED TO MARKDOWN OR CASL-2 SCRIPTS
