@@ -857,11 +857,8 @@ implied_AG_prompt <- function() {
         prep_impute()
         preds_impute()
         table_impute()
-<<<<<<< HEAD
         # need to reinitialize num_agestrat because table with imputed agestrats
         # has additional rows, this affects downstream code
-=======
->>>>>>> f80a9f341f1992a9b231c9df46eabc63601b3ec7
         assign('num_agestrat', nrow(smooth_med_SD), envir = .GlobalEnv)
         break
       } else {
