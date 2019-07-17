@@ -265,11 +265,14 @@ norm_build1 <-
     )
   ) %>% drop_na() 
 
-# Next code deals with situation where upper age ranges are ceilinged out on the
-# score being normed, such that the code to this points doesn't generate hi2
-# and/or hi1 dist_points or IRS for those upper ranges. Next section imputes new rows
-# for hi1, hi2 (in agestrats where they are missing), and copies in nearest
-# values for the remaining columns.
+# Next code deals with situation where upper age ranges are ceilinged out, or
+# lower age ranges are floored out, on the score being normed, such that the
+# code to this points doesn't generate lo1, lo2, hi1 and/or hi2 dist_points or
+# IRS for those lower/upper ranges. Next section imputes new rows for lo1, lo2,
+# med, hi1, hi2 (in agestrats where they are missing), and copies in nearest
+# values for the remaining columns. Two separate calls of tidyr::fill(), are
+# required, one to fill down the table for missing hi values, and one to fill up
+# the table for missing lo values.
 
 df_interim <- norm_build1 %>% ungroup() %>% 
   mutate(
@@ -286,6 +289,10 @@ df_interim <- norm_build1 %>% ungroup() %>%
   ) %>%
   fill(
     !!as.name(score_name):IRS_hi2
+  ) %>% 
+  fill(
+    !!as.name(score_name):IRS_hi2,
+    .direction = "up"
   ) %>% 
   mutate(
     dist_point = case_when(
@@ -1203,3 +1210,50 @@ write_csv(
     paste0('OUTPUT-FILES/', score_name, '-raw-SS-lookup.csv')
   )
 )
+
+# extract agestrat labels for processing below
+norms_names <- names(raw_to_SS_lookup)[-1]
+
+norms_pub <- raw_to_SS_lookup %>% 
+  # gather collapses wide table into three-column tall table with key-value
+  # pairs: rawscore, agestrat(key var, many rows for each agestrat), SS(value
+  # var, one row for each value of SS within each agestrat)
+  gather(agestrat, SS,-rawscore) %>% 
+  group_by(agestrat) %>%
+  # expand the table vertically, adding new rows, so there's a row for every possible SS value
+  complete(SS = 40:160) %>% 
+  ungroup() %>%
+  # regroup table by two levels
+  group_by(agestrat, SS) %>%
+  # filter step retains all 1-row groups, and the first and last rows of any
+  # multi-row groups. n() == 1 returns 1-row groups; n() > 1 & row_number()
+  # %in% c(1, n()) returns rows of multi-row groups with the row number of
+  # either 1 (first row), or n() which is the number or rows and also the
+  # number of the last row. The first and last rows hold the min and max
+  # values of raw for that value of SS (the grouping variable)
+  filter(n() == 1 | n() > 1 & row_number()  %in% c(1, n())) %>%
+  # Summarise creates a table with one row per group (one row per
+  # possible value of SS). For the 1-row groups, str_c simply passes the
+  # value of raw as a string; for the multi-row groups, str_c joins the min
+  # and max values of raw with the '=' separator.
+  summarise(rawscore = str_c(rawscore, collapse = '-')) %>%
+  # recode missing values of raw to '-'
+  mutate_at(vars(rawscore), ~ case_when(is.na(.x) ~ '-', TRUE ~ .x)) %>%
+  # sort on two levels
+  arrange(agestrat, desc(SS)) %>% 
+  # spread table back to wide, all values of SS (one row for each), agestrat
+  # columns filled with values of rawscore
+  spread(agestrat, rawscore) %>%
+  # sort descending on SS
+  arrange(desc(SS)) %>% 
+  # apply desired final column names
+  select(SS, norms_names)
+
+# write final raw-to-SS lookup table to .csv
+write_csv(
+  norms_pub, here(
+    paste0('OUTPUT-FILES/', score_name, '-raw-SS-lookup-print-table.csv')
+  )
+)
+
+
