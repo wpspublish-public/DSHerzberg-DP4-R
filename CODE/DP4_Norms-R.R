@@ -96,6 +96,28 @@ perc_z <- tribble(
   95,	1.6449
 )
 
+# write raw score descriptives by agestrat to .csv
+write_csv(eval(as.name(paste0(score_name, '_desc_agestrat'))), here(
+  paste0(
+    'OUTPUT-FILES/DESCRIPTIVE-TABLES/',
+    score_name,
+    '-descriptives-agestrat-',
+    format(Sys.Date(), "%Y-%m-%d"),
+    '.csv'
+  )
+))
+
+# write raw score freq counts by agestrat to .csv
+write_csv(eval(as.name(paste0(score_name, '_freq_agestrat'))), here(
+  paste0(
+    'OUTPUT-FILES/DESCRIPTIVE-TABLES/',
+    score_name,
+    '-frequencies-agestrat-',
+    format(Sys.Date(), "%Y-%m-%d"),
+    '.csv'
+  )
+))
+
 # Plot raw score means, SDs; pause execution for user to examine plot.
 
 #$$$$$$$$$$$NOTE: VALUE LABEL CODE BELOW NOT PROPIGATED TO MARKDOWN OR CASL-2 SCRIPTS
@@ -1207,7 +1229,7 @@ rm(raw_to_SS_lookup_empty, final_med_SD, smooth_med_SD)
 # write final raw-to-SS lookup table to .csv
 write_csv(raw_to_SS_lookup, here(
   paste0(
-    'OUTPUT-FILES/',
+    'OUTPUT-FILES/FINAL-RAW-TO-SS-LOOKUP-TABLES/',
     score_name,
     '-raw-SS-lookup-',
     format(Sys.Date(), "%Y-%m-%d"),
@@ -1256,7 +1278,7 @@ norms_pub <- raw_to_SS_lookup %>%
 # write final raw-to-SS lookup table to .csv
 write_csv(norms_pub, here(
   paste0(
-    'OUTPUT-FILES/',
+    'OUTPUT-FILES/FINAL-RAW-TO-SS-LOOKUP-TABLES/',
     score_name,
     '-raw-SS-lookup-print-table-',
     format(Sys.Date(), "%Y-%m-%d"),
