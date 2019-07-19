@@ -272,7 +272,7 @@ norm_build1 <-
 # med, hi1, hi2 (in agestrats where they are missing), and copies in nearest
 # values for the remaining columns. Two separate calls of tidyr::fill(), are
 # required, one to fill down the table for missing hi values, and one to fill up
-# the table for missing lo values.
+# the table for missing lo values.3
 
 df_interim <- norm_build1 %>% ungroup() %>% 
   mutate(
@@ -1205,11 +1205,15 @@ raw_to_SS_lookup <- raw_to_SS_lookup_empty %>%
 rm(raw_to_SS_lookup_empty, final_med_SD, smooth_med_SD)
 
 # write final raw-to-SS lookup table to .csv
-write_csv(
-  raw_to_SS_lookup, here(
-    paste0('OUTPUT-FILES/', score_name, '-raw-SS-lookup.csv')
+write_csv(raw_to_SS_lookup, here(
+  paste0(
+    'OUTPUT-FILES/',
+    score_name,
+    '-raw-SS-lookup-',
+    format(Sys.Date(), "%Y-%m-%d"),
+    '.csv'
   )
-)
+))
 
 # extract agestrat labels for processing below
 norms_names <- names(raw_to_SS_lookup)[-1]
@@ -1236,7 +1240,7 @@ norms_pub <- raw_to_SS_lookup %>%
   # possible value of SS). For the 1-row groups, str_c simply passes the
   # value of raw as a string; for the multi-row groups, str_c joins the min
   # and max values of raw with the '=' separator.
-  summarise(rawscore = str_c(rawscore, collapse = '-')) %>%
+  summarise(rawscore = str_c(rawscore, collapse = '--')) %>%
   # recode missing values of raw to '-'
   mutate_at(vars(rawscore), ~ case_when(is.na(.x) ~ '-', TRUE ~ .x)) %>%
   # sort on two levels
@@ -1250,10 +1254,14 @@ norms_pub <- raw_to_SS_lookup %>%
   select(SS, norms_names)
 
 # write final raw-to-SS lookup table to .csv
-write_csv(
-  norms_pub, here(
-    paste0('OUTPUT-FILES/', score_name, '-raw-SS-lookup-print-table.csv')
+write_csv(norms_pub, here(
+  paste0(
+    'OUTPUT-FILES/',
+    score_name,
+    '-raw-SS-lookup-print-table-',
+    format(Sys.Date(), "%Y-%m-%d"),
+    '.csv'
   )
-)
+))
 
 
