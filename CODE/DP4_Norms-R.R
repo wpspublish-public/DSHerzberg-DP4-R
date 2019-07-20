@@ -1224,7 +1224,29 @@ raw_to_SS_lookup <- raw_to_SS_lookup_empty %>%
   # left-to-right. That order of agestrats is given by the char vec
   # `c(final_med_SD$agestrat)`.
   select(rawscore, c(final_med_SD$agestrat))
-rm(raw_to_SS_lookup_empty, final_med_SD, smooth_med_SD)
+rm(raw_to_SS_lookup_empty, final_med_SD)
+
+# write final table of smoothed medians, SDs to .csv
+final_med_SD_table <- smooth_med_SD %>% 
+  select(
+    group, agestrat, lo_SD_sm, median_sm, hi_SD_sm
+  ) %>% 
+  rename(
+    smoothed_lo_SD = lo_SD_sm, smoothed_median = median_sm, smoothed_hi_SD = hi_SD_sm
+  ) %>% 
+  mutate(
+    ES = (smoothed_median - lag(smoothed_median))/((smoothed_hi_SD+lag(smoothed_hi_SD)+smoothed_lo_SD+lag(smoothed_lo_SD))/4)
+  )
+
+write_csv(final_med_SD_table, here(
+  paste0(
+    'OUTPUT-FILES/DESCRIPTIVE-TABLES/',
+    score_name,
+    '-final_med_SD_table-',
+    format(Sys.Date(), "%Y-%m-%d"),
+    '.csv'
+  )
+))
 
 # write final raw-to-SS lookup table to .csv
 write_csv(raw_to_SS_lookup, here(
