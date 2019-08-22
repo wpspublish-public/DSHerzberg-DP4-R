@@ -1,6 +1,5 @@
 # Generate norms for test scores with age-related developmental curve.
 
-#$$$$$$$$$$$NOTE: LIBRARY CODE BELOW NOT PROPIGATED TO MARKDOWN OR CASL-2 SCRIPTS
 suppressMessages(library(here)) # BEST WAY TO SPECIFY FILE PATHS
 library(reshape2) # RESHAPE DATA FROM WIDE TO TALL
 library(broom) # TIDY MODEL OUTPUTS
@@ -1178,9 +1177,10 @@ rm(list = ls()[!ls() %in% c("smooth_med_SD", "score_name", "num_agestrat", "max_
 
 # create table with only vars needed to calc standard scores
 final_med_SD <- smooth_med_SD %>% select(agestrat, median_sm, lo_SD_sm, hi_SD_sm) %>% mutate_at(vars(agestrat), ~ paste0("mo_", .x))
-# define column names for lookup stable by creating charvec of agestrat labels
-# agelabels <- final_med_SD %>% pull(agestrat) %>% paste0("mo_", .)
-# create empty look up table by binding column of all possible raw scores to set of columns holding numerical NAs, naming each column in set using agelabels charvec
+
+# create empty look up table by binding column of all possible raw scores to set
+# of columns holding numerical NAs, naming each column in set using agelabels
+# charvec
 raw_to_SS_lookup_empty <- bind_cols(
   enframe(min_raw:max_raw, name = NULL, value = 'rawscore'),
   data.frame(matrix(NA_real_, nrow = max_raw + 1, ncol = num_agestrat)) %>%
@@ -1307,5 +1307,3 @@ write_csv(norms_pub, here(
     '.csv'
   )
 ))
-
-
