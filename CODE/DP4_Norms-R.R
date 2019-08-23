@@ -107,7 +107,8 @@ write_csv(eval(as.name(paste0(score_name, '_desc_agestrat'))), here(
 ))
 
 # write raw score freq counts by agestrat to .csv
-write_csv(eval(as.name(paste0(score_name, '_freq_agestrat'))), here(
+freq_csv <- eval(as.name(paste0(score_name, '_freq_agestrat'))) %>% select(-lag_tot, -lag_cum_per)
+write_csv(freq_csv, here(
   paste0(
     'OUTPUT-FILES/DESCRIPTIVE-TABLES/',
     score_name,
@@ -116,6 +117,7 @@ write_csv(eval(as.name(paste0(score_name, '_freq_agestrat'))), here(
     '.csv'
   )
 ))
+rm(freq_csv)
 
 # Plot raw score means, SDs; pause execution for user to examine plot.
 
@@ -1307,3 +1309,4 @@ write_csv(norms_pub, here(
     '.csv'
   )
 ))
+
