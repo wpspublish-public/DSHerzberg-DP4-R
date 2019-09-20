@@ -233,7 +233,40 @@ full_join(
                     TRUE ~ 75),
     hi2 = 95
   ) %>% select(-min,-max) %>% 
-  assign(paste0(score_name, '_age_lo1lo2_hi1hi2'), ., envir = .GlobalEnv)
+  assign('lo1lo2_hi1hi2_interim', ., envir = .GlobalEnv)
+
+# Code below handles situation when lo1lo2_hi1hi2_interim is missing rows
+# because of highly skewed distributions within agestrats. Conditional code
+# identifies these sitations when nrow(lo1lo2_hi1hi2_interim) is less than
+# num_agestrat. Under that case, the code creates new rows so that all agestrats
+# are represented. It then fills in the missing values of lo1lo2_hi1hi2 using
+# the lag row.
+if (nrow(lo1lo2_hi1hi2_interim) != num_agestrat) {
+  agestrat %>% 
+    enframe() %>% 
+    select(
+      value
+    ) %>% 
+    rename(
+      agestrat = value
+    ) %>% 
+    full_join(
+      lo1lo2_hi1hi2_interim, 
+      by = 'agestrat'
+    ) %>% 
+    fill(
+      lo1,
+      lo2,
+      hi1,
+      hi2
+    ) %>% 
+    assign(paste0(score_name, '_age_lo1lo2_hi1hi2'), ., envir = .GlobalEnv)   
+} else {
+  lo1lo2_hi1hi2_interim %>% 
+    assign(paste0(score_name, '_age_lo1lo2_hi1hi2'), ., envir = .GlobalEnv) 
+}
+rm(lo1lo2_hi1hi2_interim)
+
 
 #$$$$$$$$$$$NOTE: norm_perc_prompt CODE BELOW NOT PROPIGATED TO MARKDOWN OR CASL-2 SCRIPTS
 norm_perc_prompt <- function() {
@@ -792,7 +825,7 @@ mean_plot_compare_prompt ()
 
 
 # Clean up environment
-rm(list = ls()[!ls() %in% c("smooth_med_SD", "model_median", "model_lo_SD", "model_hi_SD", "score_name", 
+rm(list = ls()[!ls() %in% c("smooth_med_SD", "model_median", "model_lo_SD", "model_hi_SD", "score_name", "input_file_name",
                             "num_agestrat", "max_raw", "min_raw", "scale_y_ceiling_mean", "scale_y_ceiling_SD", "mean_plot")])
 
 # Next code section can deal with situation where smoothed medians have effect
@@ -1172,7 +1205,7 @@ invisible(readline())
 
 
 # Clean up environment
-rm(list = ls()[!ls() %in% c("smooth_med_SD", "score_name", "num_agestrat", "max_raw", "min_raw", 
+rm(list = ls()[!ls() %in% c("smooth_med_SD", "score_name", "num_agestrat", "max_raw", "min_raw", "input_file_name",
                             "scale_y_ceiling_mean", "scale_y_ceiling_SD", "mean_plot")])
 
 # next code section generates raw-to-SS look-up tables.
