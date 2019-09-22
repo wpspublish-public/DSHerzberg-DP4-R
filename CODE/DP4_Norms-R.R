@@ -438,7 +438,7 @@ raw_vs_imputed_plot_prompt ()
 ###################
 
 # clean up environment
-v <- c(paste0(score_name, '_age_lo1lo2_hi1hi2'), paste0(score_name, '_raw_by_agestrat'))
+v <- c(paste0(score_name, '_age_lo1lo2_hi1hi2'))
 rm(norm_build1, list = v)
 
 # Plot median, lo_SD, hi_SD with regression lines and fit statistics.
@@ -825,7 +825,7 @@ mean_plot_compare_prompt ()
 
 
 # Clean up environment
-rm(list = ls()[!ls() %in% c("smooth_med_SD", "model_median", "model_lo_SD", "model_hi_SD", "score_name", "input_file_name",
+rm(list = ls()[!ls() %in% c("smooth_med_SD", "model_median", "model_lo_SD", "model_hi_SD", "score_name", "input_file_name", paste0(score_name, '_raw_by_agestrat'),
                             "num_agestrat", "max_raw", "min_raw", "scale_y_ceiling_mean", "scale_y_ceiling_SD", "mean_plot")])
 
 # Next code section can deal with situation where smoothed medians have effect
@@ -1205,7 +1205,7 @@ invisible(readline())
 
 
 # Clean up environment
-rm(list = ls()[!ls() %in% c("smooth_med_SD", "score_name", "num_agestrat", "max_raw", "min_raw", "input_file_name",
+rm(list = ls()[!ls() %in% c("smooth_med_SD", "score_name", "num_agestrat", "max_raw", "min_raw", "input_file_name", paste0(score_name, '_raw_by_agestrat'),
                             "scale_y_ceiling_mean", "scale_y_ceiling_SD", "mean_plot")])
 
 # next code section generates raw-to-SS look-up tables.
@@ -1338,6 +1338,31 @@ write_csv(norms_pub, here(
     'OUTPUT-FILES/FINAL-RAW-TO-SS-LOOKUP-TABLES/',
     score_name,
     '-raw-SS-lookup-print-table-',
+    format(Sys.Date(), "%Y-%m-%d"),
+    '.csv'
+  )
+))
+
+# generate SS per case and write data file to .csv
+eval(as.name(paste0(score_name, '_raw_by_agestrat'))) %>% 
+  left_join(
+    final_med_SD_table,
+    by = 'agestrat'
+  ) %>% 
+  mutate(!!as.name(paste0(score_name, '_SS')) := case_when(
+    !!as.name(score_name) <= smoothed_median ~ round(100+(((!!as.name(score_name)-smoothed_median)/smoothed_lo_SD)*15), 0),
+    TRUE ~ round(100+(((!!as.name(score_name)-smoothed_median)/smoothed_hi_SD)*15), 0)
+  )) %>% 
+  select(
+    ID, agestrat, adpscore_teacher, adpscore_teacher_SS
+  ) %>% 
+  assign('SS_per_case', ., envir = .GlobalEnv)
+
+write_csv(SS_per_case, here(
+  paste0(
+    'OUTPUT-FILES/SS-PER-CASE/',
+    score_name,
+    '-SS-per-case-',
     format(Sys.Date(), "%Y-%m-%d"),
     '.csv'
   )
