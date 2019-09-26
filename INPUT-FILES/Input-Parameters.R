@@ -1,4 +1,4 @@
-input_file_name <- c('TEACHER_ADP.csv')
-score_name <- c('adpscore_teacher')
-max_raw <- 38
-min_raw <- 0
+input_file_name <- c('INTERVIEW_norms-format_GDS.csv')
+score_name <- c('GDS_interview')
+max_raw <- 757
+min_raw <- 200

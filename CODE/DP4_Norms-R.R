@@ -1218,7 +1218,7 @@ final_med_SD <- smooth_med_SD %>% select(agestrat, median_sm, lo_SD_sm, hi_SD_sm
 # charvec
 raw_to_SS_lookup_empty <- bind_cols(
   enframe(min_raw:max_raw, name = NULL, value = 'rawscore'),
-  data.frame(matrix(NA_real_, nrow = max_raw + 1, ncol = num_agestrat)) %>%
+  data.frame(matrix(NA_real_, nrow = (max_raw - min_raw) + 1, ncol = num_agestrat)) %>%
     set_colnames(final_med_SD$agestrat)
 )
 
@@ -1354,7 +1354,7 @@ eval(as.name(paste0(score_name, '_raw_by_agestrat'))) %>%
     TRUE ~ round(100+(((!!as.name(score_name)-smoothed_median)/smoothed_hi_SD)*15), 0)
   )) %>% 
   select(
-    ID, agestrat, adpscore_teacher, adpscore_teacher_SS
+    ID, agestrat, !!as.name(score_name), !!as.name(paste0(score_name, '_SS'))
   ) %>% 
   assign('SS_per_case', ., envir = .GlobalEnv)
 
@@ -1367,4 +1367,5 @@ write_csv(SS_per_case, here(
     '.csv'
   )
 ))
+
 
