@@ -28,14 +28,14 @@ list2env(
   )
 rm(list)
 
-interview_SS_list <- list(
-  DP4_interview_ADP_SS, 
-  DP4_interview_COG_SS, 
-  DP4_interview_COM_SS, 
-  DP4_interview_PHY_SS,
-  DP4_interview_SOC_SS)
+teacher_SS_list <- list(
+  DP4_teacher_ADP_SS, 
+  DP4_teacher_COG_SS, 
+  DP4_teacher_COM_SS, 
+  DP4_teacher_PHY_SS,
+  DP4_teacher_SOC_SS)
 
-interview_SS <- interview_SS_list %>% 
+teacher_SS <- teacher_SS_list %>% 
   reduce(
     left_join, 
     by = "ID"
@@ -47,17 +47,17 @@ interview_SS <- interview_SS_list %>%
          -contains('.')
          ) %>% 
   mutate(
-    GDS_interview = rowSums(select(., contains("SS")))
+    GDS_teacher = rowSums(select(., contains("SS")))
   )
-rm(interview_SS_list)
+rm(teacher_SS_list)
 
-interview_SS %>% select(
+teacher_SS %>% select(
   ID,
   agestrat,
-  GDS_interview
+  GDS_teacher
   ) %>% 
   write_csv(here(
-    'INPUT-FILES/INTERVIEW_norms-format_GDS.csv'
+    'INPUT-FILES/TEACHER_norms-format_GDS.csv'
   )
 )
 
