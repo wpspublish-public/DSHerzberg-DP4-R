@@ -1,6 +1,7 @@
 suppressMessages(library(here))
 library(magrittr)
 suppressMessages(suppressWarnings(library(tidyverse)))
+library(runner)
 
 input <- suppressMessages(
   read_csv(
@@ -22,7 +23,7 @@ input_tidy <- input %>%
   select(-age_in_months) %>% 
   # mutate creates new var, row_number() returns row number of input object, but
   # because object is grouped by IDnum, row_number() resets when IDnum changes to next
-  # value; col_num adds 1 because in origin input table, the item columns start
+  # value; col_num adds 2 because in origin input table, the item columns start
   # on col 3
   mutate(col_num = row_number() + 2) 
 
@@ -32,7 +33,7 @@ output_basal <- input[,1] %>%
   # table so that it contains only the 0 cells from the original input rows
   left_join(input_tidy %>% filter(val == 0) %>%
               # In the input object there are multiple 0 rows per IDnum, and going
-              # down the table they are arranged in aascending order of item
+              # down the table they are arranged in ascending order of item
               # numbers going from left-to-right in the original input table.
               # first() returns only the first of those 0 rows, which, because
               # of the correspondence between the current row order and the
@@ -44,8 +45,8 @@ output_basal <- input[,1] %>%
                         first_0_loc = first(col_num))) %>%
   # Combine with length of each IDnum's first post-0 streak of 1's. First join
   # first_0_name and first_0_loc columns to gathered table from upstream. At
-  # this point, the piped object has 180 rows, one row for each cell in the
-  # crossing of cases(12) x items(15). The input object is grouped by IDnum, and
+  # this point, the piped object has one row for each cell in the
+  # crossing of cases x items. The input object is grouped by IDnum, and
   # within each group of rows, the items are ordered ascending going down the
   # table
   left_join(input_tidy %>%
@@ -85,6 +86,34 @@ freq_1streak <- output_basal %>%
     perc = round(100*(n/sum(n)), 4), 
     cum_per = round(100*(cumsum(n)/sum(n)), 4)
     )
+
+highest_basal_streak <- input_tidy %>%
+  # create new col using runner::streak_run to count, for each cell in val col,
+  # what is the current length of consecutive identical values
+  mutate(streak = streak_run(val)) %>%
+  # pare table so that it includes only streaks of a certain length, for only
+  # certain values. To make sure that streaks of x are not simply the first
+  # section of longer streaks of length x + n, only keep streaks where the
+  # leading value of streak is either 1 (meaning streak has reset because
+  # previous streak ended at x) or NA (for streaks that end with last row of
+  # input table)
+  filter(val == 1 & (streak == 4 & (lead(streak) == 1 | is.na(lead(streak))))) %>%
+  # In the input object there are multiple rows per IDnum, and going
+  # down the table they are arranged in ascending order of item
+  # numbers going from left-to-right in the original input table.
+  # last() returns only the last of those rows within each IDnum, which, because
+  # of the correspondence between the current row order and the
+  # column order of the original input table, returns the column
+  # name of the last item in the highest run of a streak of 4 1s.
+  summarize(last_streak1_name = last(col)) %>% 
+  full_join(input, by = "IDnum") %>% 
+  select(IDnum, last_streak1_name) %>% 
+  arrange(IDnum)
+
+test <- highest_basal_streak %>% drop_na()
+
+
+
 
 output_ceiling <- input[,1] %>% 
   left_join(input_tidy) %>% 
