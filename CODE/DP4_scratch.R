@@ -1,17 +1,15 @@
 suppressMessages(library(tidyverse))
 library(runner)
 
-set.seed(11)
-x1 <- sample(c("a","b"),15,replace=TRUE)
-x2 <- sample(c(NA_character_,"a","b"),15,replace=TRUE)
-k <- sample(1:4,15,replace=TRUE)
-streak_run(x1) # simple streak run
-streak_run(x1, k=2) # streak run within 2-element window
-streak_run(x2, na_pad=TRUE, k=3) # streak run within k=3 with padding NA
-streak_run(x1, k=k) # streak run within varying window size specified by vector k
-
-
-test <- input_tidy %>% mutate(streak = streak_run(val))
+# set.seed(11)
+# x1 <- sample(c("a","b"),15,replace=TRUE)
+# x2 <- sample(c(NA_character_,"a","b"),15,replace=TRUE)
+# k <- sample(1:4,15,replace=TRUE)
+# streak_run(x1) # simple streak run
+# streak_run(x1, k=2) # streak run within 2-element window
+# streak_run(x2, na_pad=TRUE, k=3) # streak run within k=3 with padding NA
+# streak_run(x1, k=k) # streak run within varying window size specified by vector k
+# test <- input_tidy %>% mutate(streak = streak_run(val))
 
 input_repex <- tribble(
   ~ID, ~i1, ~i2, ~i3, ~i4, ~i5, ~i6, ~i7, ~i8, ~i9, ~i10, ~i11, ~i12, ~i13, ~i14, ~i15,
@@ -44,13 +42,13 @@ test_repex <- input_repex_tidy %>%
   # create new col using runner::streak_run to count, for each cell in val col,
   # what is the current length of consecutive identical values
   mutate(streak = streak_run(val)) %>%
-  # pare table so that it includes only streaks of a certain length, for only
-  # certain values. To make sure that streaks of x are not simply the first
-  # section of longer streaks of length x + n, only keep streaks where the
-  # leading value of streak is either 1 (meaning streak has reset because
-  # previous streak ended at x) or NA (for streaks that end with last row of
-  # input table)
-  filter(val == 1 & (streak == 4 & (lead(streak) == 1 | is.na(lead(streak))))) %>%
+  # pare table so that it includes only streaks of a certain length, or longer,
+  # for only certain values. If you want, you can make sure that streaks of x
+  # are not simply the first section of longer streaks of length x + n, only
+  # keep streaks where the leading value of streak is either 1 (meaning streak
+  # has reset because previous streak ended at x) or NA (for streaks that end
+  # with last row of input table) - append this logic statement: `& (lead(streak) == 1 | is.na(lead(streak))))`
+  filter(val == 1 & streak >= 4) %>%
   # In the input object there are multiple rows per ID, and going
   # down the table they are arranged in ascending order of item
   # numbers going from left-to-right in the original input table.
