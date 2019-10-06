@@ -2,6 +2,8 @@ suppressMessages(library(here))
 library(magrittr)
 suppressMessages(suppressWarnings(library(tidyverse)))
 library(runner)
+library(data.table)
+
 
 input <- suppressMessages(
   read_csv(
@@ -96,35 +98,98 @@ freq_1streak <- output_basal %>%
 # implement for each case in the input data.
 streak_length <- 4
 
-############# NEXT: BRING IN start_repex sequence from scratch script.
+# highest_basal_streak <- input_tidy %>%
+#   # create new col using runner::streak_run to count, for each cell in val col,
+#   # what is the current length of consecutive identical values
+#   mutate(streak = streak_run(val)) %>%
+#   # pare table so that it includes only streaks of a certain length, or longer,
+#   # for only certain values. If you want, you can make sure that streaks of x
+#   # are not simply the first section of longer streaks of length x + n, only
+#   # keep streaks where the leading value of streak is either 1 (meaning streak
+#   # has reset because previous streak ended at x) or NA (for streaks that end
+#   # with last row of input table) - append this logic statement: `&
+#   # (lead(streak) == 1 | is.na(lead(streak))))`
+#   filter(val == 1 & streak >= 4) %>%
+#   # In the input object there are multiple rows per IDnum, and going
+#   # down the table they are arranged in ascending order of item
+#   # numbers going from left-to-right in the original input table.
+#   # last() returns only the last of those rows within each IDnum, which, because
+#   # of the correspondence between the current row order and the
+#   # column order of the original input table, returns the column
+#   # name of the last item in the highest run of a streak of 1s that
+#   # is greater than or equal to your chosen streak length.
+#   summarize(last_streak1_name = last(col)) %>%
+#   full_join(input, by = "IDnum") %>%
+#   select(IDnum, last_streak1_name) %>%
+#   arrange(IDnum)
+# 
+# test <- highest_basal_streak %>% drop_na()
 
-
-highest_basal_streak <- input_tidy %>%
-  # create new col using runner::streak_run to count, for each cell in val col,
-  # what is the current length of consecutive identical values
-  mutate(streak = streak_run(val)) %>%
-  # pare table so that it includes only streaks of a certain length, or longer,
-  # for only certain values. If you want, you can make sure that streaks of x
-  # are not simply the first section of longer streaks of length x + n, only
-  # keep streaks where the leading value of streak is either 1 (meaning streak
-  # has reset because previous streak ended at x) or NA (for streaks that end
-  # with last row of input table) - append this logic statement: `&
-  # (lead(streak) == 1 | is.na(lead(streak))))`
-  filter(val == 1 & streak >= 4) %>%
-  # In the input object there are multiple rows per IDnum, and going
-  # down the table they are arranged in ascending order of item
-  # numbers going from left-to-right in the original input table.
-  # last() returns only the last of those rows within each IDnum, which, because
-  # of the correspondence between the current row order and the
-  # column order of the original input table, returns the column
-  # name of the last item in the highest run of a streak of 1s that
-  # is greater than or equal to your chosen streak length.
-  summarize(last_streak1_name = last(col)) %>% 
+# Next sequence gets start item for start rule of streak_length + 1.
+start <- input_tidy %>%
+  group_by(IDnum) %>% 
+  # From the tidy input, label rows that contain correct responses and are part
+  # of a win streak equal to or greater than streak_length.
+  mutate(
+    streak_x = case_when(
+      val == 1 & streak_run(val) >= streak_length ~ 1,
+      TRUE ~ NA_real_
+    ),
+    # First step of isolating the start item: apply a label to only the last
+    # row of streak_x, which you find by setting a logical T to the next row of
+    # streak_x being NA. The label you apply is the column number that lags the
+    # row you chose by streak_length. Start_item now holds the column number of
+    # the desired start item.
+    start_item = case_when(
+      streak_x == 1 & is.na(lead(streak_x)) ~ col_num - streak_length,
+      TRUE ~ NA_real_
+    )
+  ) %>% 
+  # Now that you know the col num of desired start item per case, you have to
+  # isolate the rows that actually contain those items, which you accomplish by
+  # selecting (filter) rows whose value of col_num equals the value of
+  # start_item in the row that leads (is ahead) of the row you want by
+  # streak_length. To understand the operation of the filter, start with a row
+  # that contains a value for start_item, lag this row by streak_length, and you
+  # end up on the row that contains the col_num corresponding to the desired
+  # start_item.
+  filter(col_num == lead(start_item, streak_length)) %>% 
+  # recode start_item so that it contains the actual name of the start item,
+  # which is found in column `col` from the tidy input.
+  mutate(start_item = col) %>% 
+  # At this point the data object contains a start item for each streak >=
+  # streak_length. We only want the last (highest) of these start items, because
+  # that is the one that corresponds to the highest basal streak (so it will
+  # yield a true basal). We use summarize() to return only the last start item
+  # for each case (remember, data object is already grouped by ID, so it can be
+  # summarized)
+  summarize(start = last(start_item)) %>% 
+  # need next full_join to bring back NA rows (e.g., rows that have no basal
+  # streaks because they are a 1 follwed by all 0s, etc.), as well as items
+  # themselves and other input data.
   full_join(input, by = "IDnum") %>% 
-  select(IDnum, last_streak1_name) %>% 
-  arrange(IDnum)
+  mutate(age_strat = case_when(
+    age_in_months <= 23 ~ "0-0 to 1-11",
+    inrange(age_in_months, 24, 47, incbounds=TRUE) ~ "2-0 to 3-11",
+    inrange(age_in_months, 48, 71, incbounds=TRUE) ~ "4-0 to 5-11",
+    inrange(age_in_months, 72, 258, incbounds=TRUE) ~ "6-0+",
+    TRUE ~ NA_character_
+  )
+  ) %>% 
+  select(IDnum, age_strat, age_in_months, start, everything()) %>% 
+  arrange(age_strat, age_in_months)
 
-test <- highest_basal_streak %>% drop_na()
+# START HERE - EVALUATE FREQ OF START ITEMS WITHIN DP-3 STARTING AGES
+
+freq_start <- start %>% 
+  group_by(age_in_months) %>% 
+  drop_na(start) %>% 
+  count(start) %>% 
+  mutate(
+    perc = round(100*(n/sum(n)), 4), 
+    cum_per = round(100*(cumsum(n)/sum(n)), 4)
+  )
+
 
 
 
