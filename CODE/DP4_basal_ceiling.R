@@ -11,9 +11,14 @@ input <- suppressMessages(
   )
 ) 
 
+# rename items to sequential numbering, `names(input)[1:2]` extracts first two
+# var names, which don't change; `sprintf()` is a string function that allows
+# you to create sequences with leading 0, e.g., '01, 02, 03'
+names(input) <- c(names(input)[1:2], c(paste0('item_', sprintf("%02d", 1:37))))
+
 input_tidy <- input %>%
   # gather columns to express each cell as a key-value pair: col_name-cell_value
-  gather(col, val, PHY06:PHY48) %>% 
+  gather(col, val, item_01:item_37) %>% 
   # group by IDnum, this allows a set of rows in the gathered table to be
   # identified with their origin row in the input table.
   group_by(IDnum) %>%
@@ -87,24 +92,33 @@ freq_1streak <- output_basal %>%
     cum_per = round(100*(cumsum(n)/sum(n)), 4)
     )
 
+# after examining frequency table `freq_1streak`, designate a streak_length to
+# implement for each case in the input data.
+streak_length <- 4
+
+############# NEXT: BRING IN start_repex sequence from scratch script.
+
+
 highest_basal_streak <- input_tidy %>%
   # create new col using runner::streak_run to count, for each cell in val col,
   # what is the current length of consecutive identical values
   mutate(streak = streak_run(val)) %>%
-  # pare table so that it includes only streaks of a certain length, for only
-  # certain values. To make sure that streaks of x are not simply the first
-  # section of longer streaks of length x + n, only keep streaks where the
-  # leading value of streak is either 1 (meaning streak has reset because
-  # previous streak ended at x) or NA (for streaks that end with last row of
-  # input table)
-  filter(val == 1 & (streak == 4 & (lead(streak) == 1 | is.na(lead(streak))))) %>%
+  # pare table so that it includes only streaks of a certain length, or longer,
+  # for only certain values. If you want, you can make sure that streaks of x
+  # are not simply the first section of longer streaks of length x + n, only
+  # keep streaks where the leading value of streak is either 1 (meaning streak
+  # has reset because previous streak ended at x) or NA (for streaks that end
+  # with last row of input table) - append this logic statement: `&
+  # (lead(streak) == 1 | is.na(lead(streak))))`
+  filter(val == 1 & streak >= 4) %>%
   # In the input object there are multiple rows per IDnum, and going
   # down the table they are arranged in ascending order of item
   # numbers going from left-to-right in the original input table.
   # last() returns only the last of those rows within each IDnum, which, because
   # of the correspondence between the current row order and the
   # column order of the original input table, returns the column
-  # name of the last item in the highest run of a streak of 4 1s.
+  # name of the last item in the highest run of a streak of 1s that
+  # is greater than or equal to your chosen streak length.
   summarize(last_streak1_name = last(col)) %>% 
   full_join(input, by = "IDnum") %>% 
   select(IDnum, last_streak1_name) %>% 
@@ -114,7 +128,7 @@ test <- highest_basal_streak %>% drop_na()
 
 
 
-
+# ceiling code below here.
 output_ceiling <- input[,1] %>% 
   left_join(input_tidy) %>% 
   group_by(IDnum) %>%
