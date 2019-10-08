@@ -13,14 +13,18 @@ input_orig_names <- suppressMessages(
   )
 ) 
 
-# represent input item names as rows in a df. Thus, `df_names` provide key for
+####### FIRST SECTION OF CODE DEALS WITH START RULE / BASAL
+
+# represent input item names as rows in a df. Thus, `df_names` provides key for
 # matching input item names to sequential item numbering, the latter being
-# represented in the df_names$value col.
+# represented in the df_names$value col. The single bracket [] is an extraction
+# of only the columns that are actual items (e.g., not IDnum, age, etc.)
 df_names <- enframe(names(input_orig_names)[3:39])
 
 # rename items to sequential numbering, `names(input)[1:2]` extracts first two
 # var names, which don't change; `sprintf()` is a string function that allows
-# you to create sequences with leading 0, e.g., '01, 02, 03'
+# you to create sequences with leading 0, e.g., '01, 02, 03'. %02d means "format
+# the integer with 2 digits, left padding it with zeroes"
 input <- input_orig_names
 names(input) <- c(names(input)[1:2], c(paste0('i', sprintf("%02d", 1:37))))
 
@@ -40,7 +44,8 @@ input_ID_raw_score <- input %>%
   select(IDnum, age_in_months, agestrat, TOT_raw) %>% 
   arrange(IDnum)
 
-
+# For downstream code, we need a gathered table in which columns of the original
+# input are transformed into rows in the gathered table.
 input_tidy <- input %>%
   # gather columns to express each cell as a key-value pair: col_name-cell_value
   gather(col, val, i01:i37) %>% 
@@ -51,15 +56,19 @@ input_tidy <- input %>%
   arrange(IDnum) %>%
   # drop age column
   select(-age_in_months) %>% 
-  # mutate creates new var, row_number() returns row number of input object, but
-  # because object is grouped by IDnum, row_number() resets when IDnum changes to next
-  # value; col_num adds 2 because in origin input table, the item columns start
-  # on col 3
+  # mutate creates new var to capture the original left-to-right column number
+  # of each item from original input file, row_number() returns row number of
+  # current piped object (a gathered table where input columns are expressed as
+  # rows), but because object is grouped by IDnum, row_number() resets when
+  # IDnum changes to next value; in calculating `col_num` we add 2 because in
+  # origin input table, the item columns start on col 3
   mutate(col_num = row_number() + 2) 
 
-# start this pipeline with the IDnum column only from the original input table.
+# Purpose of next block is to find the first 0 for each case, and then find the
+# length of the string of 1s immediately above that first 0. We start this
+# pipeline with the IDnum column only from the original input table.
 output_basal <- input[,1] %>% 
-  # Combine these IDnumS with summary of each IDnum's first zero, filter reduces the
+  # Combine these IDnums with summary of each IDnum's first zero, filter reduces the
   # table so that it contains only the 0 cells from the original input rows
   left_join(input_tidy %>% filter(val == 0) %>%
               # In the input object there are multiple 0 rows per IDnum, and going
@@ -70,15 +79,15 @@ output_basal <- input[,1] %>%
               # column order of the original input table, returns the column
               # name of the first item scored 0.
               summarize(first_0_name = first(col),
-                        # analogously, this use of first() returns the column
-                        # location of the first item scored 0.
+                        # analogously, this next use of first() returns the
+                        # origin column location of the first item scored 0.
                         first_0_loc = first(col_num))) %>%
   # Combine with length of each IDnum's first post-0 streak of 1's. First join
   # first_0_name and first_0_loc columns to gathered table from upstream. At
-  # this point, the piped object has one row for each cell in the
-  # crossing of cases x items. The input object is grouped by IDnum, and
-  # within each group of rows, the items are ordered ascending going down the
-  # table
+  # this point, the piped object has one row for each cell in the crossing of
+  # cases x items. The input object is grouped by IDnum, and within each group
+  # of rows, the ascending, left-to-right item order of the origin table is
+  # represented descending (going down the rows) of the piped table
   left_join(input_tidy %>%
               # this filter pares rows out of each IDnum group, such that, for each
               # IDnum, the remaining rows begin with the row that holds the first 1
@@ -105,10 +114,12 @@ output_basal <- input[,1] %>%
               # is equivalent to the length of the streak of 1 scores above the
               # first 0 score.
               summarize(streak_1 = n())) %>% 
-              # select(-IDnum) %>% 
               mutate(streak_1 = as.numeric(streak_1)) %>% 
               left_join(input, by = 'IDnum')
 
+
+# Now we get a freq table of counts of streak length (streak of 1s above first
+# 0) over entire input sample
 freq_1streak <- output_basal %>% 
   drop_na(streak_1) %>% 
   count(streak_1) %>% 
@@ -121,24 +132,31 @@ freq_1streak <- output_basal %>%
 # implement for each case in the input data.
 streak_length <- 4
 
-# Next sequence gets start item for start rule of streak_length + 1.
+# Next sequence gets start item for start rule of streak_length + 1 (meaning you
+# must get a win streak of streak_length + 1 in order to continue testing
+# forward). Why is the start rule "+1"? Because the rule has stay active all the
+# way through this streak_length, so that it can catch the 0 above the streak.
 start_data <- input_tidy %>%
   # group_by(IDnum) allows you to find start item per case
   group_by(IDnum) %>% 
-  # From the tidy input, label rows that contain correct responses and are part
-  # of a win streak equal to or greater than streak_length. runner::streak_run
-  # gets count, for each cell in val col, what is the current length of
-  # streak of consecutive identical values?
+  # From the tidy input, label rows that contain correct responses (val = 1) and
+  # are part of a win streak equal to or greater than streak_length.
+  # runner::streak_run gets count, for each cell in val col, what is the current
+  # length of streak of consecutive identical values?
   mutate(
     streak_x = case_when(
       val == 1 & streak_run(val) >= streak_length ~ 1,
       TRUE ~ NA_real_
     ),
-    # First step of isolating the start item: apply a label to only the last
-    # row of streak_x, which you find by setting a logical T to the next row of
-    # streak_x being NA. The label you apply is the column number that lags the
-    # row you chose by streak_length. Start_item now holds the column number of
-    # the desired start item.
+    # First step of isolating the start item: apply a label to only the last row
+    # of streak_x, which you find by testing whether, in the lead row to any
+    # row, the value of streak_x is NA. If that condition is true, then the
+    # current row is the last correct response of streak_x. The label you apply
+    # is the column number that lags the row you chose by streak_length.
+    # Start_item now holds the column number of the desired start item. Why?
+    # Because if your start rule is streak_length + 1, this is the item for
+    # which implementing that start rule guarantees that you will catch the next
+    # 0 and be forced to test backwards to satisfy the start rule.
     start_item = case_when(
       streak_x == 1 & is.na(lead(streak_x)) ~ col_num - streak_length,
       TRUE ~ NA_real_
@@ -146,12 +164,18 @@ start_data <- input_tidy %>%
   ) %>% 
   # Now that you know the col num of desired start item per case, you have to
   # isolate the rows that actually contain those items, which you accomplish by
-  # selecting (filter) rows whose value of col_num equals the value of
-  # start_item in the row that leads (is ahead) of the row you want by
-  # streak_length. To understand the operation of the filter, start with a row
-  # that contains a value for start_item, lag this row by streak_length, and you
-  # end up on the row that contains the col_num corresponding to the desired
-  # start_item.
+  # selecting (filter) rows whose value of `col_num` equals the value of
+  # `start_item`` in the row that leads (is ahead) of the row you want by
+  # streak_length. (Note that `streak_length` is passed as the second argument
+  # to `lead()` so that it retuns a row that leads by more than one row (default
+  # would be leading by one row)). 
+  
+  # To understand the operation of the filter, generate and view the data object
+  # up to this point in the pipeline, look for a row that contains a value for
+  # `start_item`, lag this row by streak_length, and you end up on the row that
+  # contains the `col_num` corresponding to the desired start_item. You will see
+  # that the value of `col_num` in the lagged row is identical to the value of
+  # `start_item` in the row you started on.
   filter(col_num == lead(start_item, streak_length)) %>% 
   # recode start_item so that it contains the actual name of the start item,
   # which is found in column `col` from the tidy input.
@@ -160,13 +184,14 @@ start_data <- input_tidy %>%
   # streak_length. We only want the last (highest) of these start items, because
   # that is the one that corresponds to the highest basal streak (so it will
   # yield a true basal). We use summarize() to return only the last start item
-  # for each case (remember, data object is already grouped by ID, so it can be
-  # summarized)
+  # for each case (remember, the data object is already grouped by ID, so it can
+  # be summarized)
   summarize(start = last(start_item)) %>% 
   # need next full_join to bring back NA rows (e.g., rows that have no basal
   # streaks because they are a 1 follwed by all 0s, etc.), as well as items
   # themselves and other input data.
   full_join(input, by = "IDnum") %>% 
+  # create `agestrat` var for downstream analysis.
   mutate(agestrat = case_when(
     age_in_months <= 23 ~ "0-0 to 1-11",
     inrange(age_in_months, 24, 47, incbounds=TRUE) ~ "2-0 to 3-11",
@@ -179,7 +204,6 @@ start_data <- input_tidy %>%
   arrange(agestrat, age_in_months)
 
 # freq table of start items within agestrats (DP-4 start ages).
-
 freq_start <- start_data %>% 
   group_by(agestrat) %>% 
   drop_na(start) %>% 
@@ -195,7 +219,6 @@ hist_data <- start_data %>% filter(start != "i33")
 
 
 # histograms of start items within agestrats (DP-4 start ages).
-
 hist_plot <-
   ggplot(data = hist_data, aes(start)) +
   stat_count(width = 0.5) +
@@ -205,12 +228,9 @@ hist_plot <-
 print(hist_plot)
 
 
+####### SECOND SECTION OF CODE DEALS WITH STOP RULE / CEILING
 
-
-
-
-# ceiling code below here.
-
+# Replicate tidy input with original item names.
 input_tidy_orig_names <- input_orig_names %>%
   # gather columns to express each cell as a key-value pair: col_name-cell_value
   gather(col, val, PHY06:PHY48) %>% 
@@ -227,19 +247,33 @@ input_tidy_orig_names <- input_orig_names %>%
   # on col 3
   mutate(col_num = row_number() + 2) 
 
-
+# The purpose of the next snippet is to get the length of streak of Os below the
+# last (highest) 1 response for each case.
 output_ceiling <- input_orig_names[,1] %>% 
   left_join(input_tidy_orig_names) %>% 
   group_by(IDnum) %>%
   arrange(IDnum) %>%
+  # Pare table to only rows containing 1 item responses
   filter(val == 1) %>% 
+  # Use slice() to pare table by row position. tail() returns the last part of
+  # an object, in this case, because the data are grouped by IDnum, it returns
+  # the last rows of each IDnum group. Within tail(), we pass row_number(), and
+  # 2 to return the last two rows within each IDnum group. These two rows
+  # contain, by definition, the last two 1 responses for each IDnum.
   slice(tail(row_number(), 2)) %>% 
+  # Summarize step creates columns holding the name and original input col
+  # location for the highest (last) 1 and second-highest 1, for each case.
     summarize(
       last_1_name = last(col),
       last_1_loc = last(col_num),
       sec_last_1_name = first(col),
       sec_last_1_loc = first(col_num)
     ) %>% 
+  # now create a new var `streak_0` that holds length of streak of 0s below
+  # highest 1. First of all, there only is a streak when the column location of
+  # the highest 1 is greater than the column location of the second-highest 1.
+  # For these cases, the length of the streak of Os is simply the difference
+  # between the two column locations, minus 1.
   mutate(
     streak_0 = case_when(
       last_1_loc > sec_last_1_loc ~ (last_1_loc - sec_last_1_loc) - 1,
@@ -247,6 +281,7 @@ output_ceiling <- input_orig_names[,1] %>%
     )
   )
   
+# Next snippet gets freq counts of streak_0 accross entire sample
 freq_0streak <- output_ceiling %>% 
   drop_na(streak_0) %>% 
   count(streak_0) %>% 
@@ -255,7 +290,7 @@ freq_0streak <- output_ceiling %>%
     cum_per = round(100*(cumsum(n)/sum(n)), 4)
   )
 
-
+# START HERE: CREATE SEPARATE VARS FOR BASAL AND CEILING STREAK_LENGTH
 
 # Next sequence tests stop rule of streak_length + 1.
 stop_data <- input_tidy %>%
