@@ -4,11 +4,16 @@ suppressMessages(suppressWarnings(library(tidyverse)))
 library(runner)
 suppressMessages(library(data.table))
 
+# Initialize input parameters and read input file
+scale <- c("PHY")
+last_item <- 37
+first_item_orig_name <- c("PHY06")
+last_item_orig_name <- c("PHY48")
 
 input_orig_names <- suppressMessages(
   read_csv(
     here(
-      'INPUT-FILES/SCORED-ITEMS/DP4-PHY-interview-scored-items.csv'
+      paste0('INPUT-FILES/SCORED-ITEMS/DP4-', scale, '-interview-scored-items.csv')
     )
   )
 ) 
@@ -19,19 +24,19 @@ input_orig_names <- suppressMessages(
 # matching input item names to sequential item numbering, the latter being
 # represented in the df_names$value col. The single bracket [] is an extraction
 # of only the columns that are actual items (e.g., not IDnum, age, etc.)
-df_names <- enframe(names(input_orig_names)[3:39])
+df_names <- enframe(names(input_orig_names)[3:last_item+2])
 
 # rename items to sequential numbering, `names(input)[1:2]` extracts first two
 # var names, which don't change; `sprintf()` is a string function that allows
 # you to create sequences with leading 0, e.g., '01, 02, 03'. %02d means "format
 # the integer with 2 digits, left padding it with zeroes"
 input <- input_orig_names
-names(input) <- c(names(input)[1:2], c(paste0('i', sprintf("%02d", 1:37))))
+names(input) <- c(names(input)[1:2], c(paste0('i', sprintf("%02d", 1:last_item))))
 
 # Create a df with just IDnum age and total raw score, for later evalution of stop rule.
 input_ID_raw_score <- input %>%   
   mutate(
-  TOT_raw = rowSums(.[3:39])
+  TOT_raw = rowSums(.[3:last_item+2])
 ) %>% 
   mutate(agestrat = case_when(
     age_in_months <= 23 ~ "0-0 to 1-11",
@@ -48,7 +53,7 @@ input_ID_raw_score <- input %>%
 # input are transformed into rows in the gathered table.
 input_tidy <- input %>%
   # gather columns to express each cell as a key-value pair: col_name-cell_value
-  gather(col, val, i01:i37) %>% 
+  gather(col, val, i01:!!as.name(paste0('i', last_item))) %>% 
   # group by IDnum, this allows a set of rows in the gathered table to be
   # identified with their origin row in the input table.
   group_by(IDnum) %>%
@@ -213,9 +218,10 @@ freq_start <- start_data %>%
     cum_per = round(100*(cumsum(n)/sum(n)), 4)
   )
 
-# Drop all rows where start item is top item (i33) - there are so many of these
-# that it skews histogram and makes the graph difficult to read.
-hist_data <- start_data %>% filter(start != "i33")
+# Drop all rows where start item is highest possible item (last_item-streak_1_length) - there
+# are so many of these that it skews histogram and makes the graph difficult to
+# read.
+hist_data <- start_data %>% filter(start != paste0('i', last_item-streak_1_length))
 
 
 # histograms of start items within agestrats (DP-4 start ages).
@@ -233,7 +239,7 @@ print(hist_plot)
 # Replicate tidy input with original item names.
 input_tidy_orig_names <- input_orig_names %>%
   # gather columns to express each cell as a key-value pair: col_name-cell_value
-  gather(col, val, PHY06:PHY48) %>% 
+  gather(col, val, first_item_orig_name:last_item_orig_name) %>% 
   # group by IDnum, this allows a set of rows in the gathered table to be
   # identified with their origin row in the input table.
   group_by(IDnum) %>%
@@ -294,77 +300,103 @@ freq_0streak <- output_ceiling %>%
 # implement for each case in the input data.
 streak_0_length <- 4
 
-# START HERE:
+####### THIRD SECTION OF CODE RESCORES INPUT DATA WITH STOP/START RULES APPLIED
 
-# Next sequence tests stop rule of streak_0_length + 1.
-stop_data <- input_tidy %>%
-  # group_by(IDnum) allows you to find stop item per case
+# Next sequence rescores input data by applying start rule of streak_1_length +
+# 1 and stop rule of streak_0_length + 1. The approach is to find the highest
+# start rule streak for each case, and recode all 0s below this streak to 1, and
+# to find the lowest stop rule streak and recode all 1s above this streak to O.
+# The code accomplishes this dual-recoding in a single pass.
+rescore_data <- input_tidy %>%
+  # group_by(IDnum) allows you to find streaks indepently within each case.
   group_by(IDnum) %>% 
-  # From the tidy input, label rows that contain incorrect responses and are
-  # part of a losing streak equal to or greater than streak_0_length + 1.
+  # From the tidy input, label rows that contain correct responses (val = 1) and
+  # are part of a win streak equal to or greater than streak_1_length.
   # runner::streak_run gets count, for each cell in val col, what is the current
-  # length of streak of consecutive identical values?
+  # length of streak of consecutive identical values? Repeat for val = 0.
   mutate(
+    streak_x_1 = case_when(
+      val == 1 & streak_run(val) >= streak_1_length + 1 ~ 1,
+      TRUE ~ NA_real_
+    ),
     streak_x_0 = case_when(
       val == 0 & streak_run(val) >= streak_0_length + 1 ~ 1,
       TRUE ~ NA_real_
     ),
-    # First step of isolating the stop item: apply a label to only the first row
-    # of streak_x_0, which you find by setting a logical T to the previous row
-    # of streak_x being NA. The label you apply is the column number, meaning
-    # that `stop_item` now holds the column number of a stop item. However,
-    # there may be more than one stop item per case, if there are multiple
-    # losing streaks of streak_0_length+1 within the case. We want the stop item
-    # to be the lowest of these streaks, because that provides the most
-    # stringent test of equivalency between the basic input raw total score, and
-    # the raw total score with stop rule applied.
+    # `start_item` and `stop_item` will contain the items from which to commence
+    # upward and downward rescoring (application of start/stop rules). First
+    # step of isolating the start item: apply a label to only the last row of
+    # streak_x, which you find by testing whether, in the lead row to any row,
+    # the value of streak_x is NA. If that condition is TRUE, then the current
+    # row is the last correct response of streak_x. The label you apply is the
+    # column number of that row. To apply this same function for streaks of 0,
+    # you change the lead() wrapper to lag(), and if this modified `is.na`
+    # condition is TRUE, the current row is the first 0 response of the streak
+    # of 0s.
+    start_item = case_when(
+      streak_x_1 == 1 & is.na(lead(streak_x_1)) ~ col_num,
+      TRUE ~ NA_real_
+    ),
     stop_item = case_when(
       streak_x_0 == 1 & is.na(lag(streak_x_0)) ~ col_num,
       TRUE ~ NA_real_
     )
-    ) %>% 
-  # To recode items to 0 above the stop item, we need all cells in `stop_item`,
-  # within each case, to hold the desired value of stop_item. We use two fill()
+  ) %>% 
+  # To rescore according to the stop/start rules, we need all cells in the
+  # `start_item` and `stop_item` columns, within each case, to hold the items
+  # that are the thresholds for rescoring above and below. We use two fill()
   # steps to accomplish this, the first one replicating the existing value
-  # (replacing NA) of stop_item down the table, within each case.
-  fill(stop_item) %>% 
+  # (replacing NA) of start_item and stop_item down the table, within each case.
+  fill(start_item, stop_item) %>% 
   # second fill step reverses direction and fills existing values going up the
   # table.
-  fill(stop_item, .direction = "up") %>% 
-  # now we use `mutate()` to recode `stop_item` to its minimum value per case, so
-  # the stop rule is applied after the lowest losing streak of streak_0_length+1.
-  # This recode step only affects cases that contain more than one value for
-  # `stop_item`.
-  mutate(stop_item = min(
+  fill(start_item, stop_item, .direction = "up") %>% 
+  # now we use `mutate()` to recode `start_item` to its maximum value per case,
+  # and stop_item` to its minimum value per case, so the start rule is applied
+  # below the highest winning streak of streak_1_length +1, and the stop rule is
+  # applied above the lowest losing streak of streak_0_length+1. This recode
+  # step only affects cases that contain more than one value for `start_item`
+  # and/or `stop_item`.
+  mutate(start_item = max(
+    start_item
+  ),
+  stop_item = min(
     stop_item
-    ),
-    # now we are in a position to recode all values of `val` to 0 above the
-    # desire stop item. We do this by isolating rows whose col_num is greater
-    # than the col_num of the stop item, and recoding `val` to 0.
-    val = case_when(
-      col_num > stop_item ~ 0,
-      TRUE ~ val
-    )
-    ) %>% 
-    # spread data to get total score per case with stop rule applied. First drop interim cols.
-  select(-col_num, -streak_x_0, -stop_item) %>% 
+  ),
+  # now we are in a position to recode all values of `val` to 1 below the
+  # desired start_item, and to 0 above the desire stop item. We do this
+  # squentially, by isolating rows whose col_num is less than the col_num of teh
+  # start item, and recoding `val` to 1, and then isolating rows whose col_num
+  # is greater than the col_num of the stop item, and recoding `val` to 0.
+  val = case_when(
+    col_num < start_item ~ 1,
+    TRUE ~ val
+  ),
+  val = case_when(
+    col_num > stop_item ~ 0,
+    TRUE ~ val
+  )
+  ) %>% 
+  # spread data to get total score per case with stop rule applied. First drop interim cols.
+  select(-col_num, -streak_x_1, -start_item, -streak_x_0, -stop_item) %>% 
   spread(col, val) %>% 
   ungroup() %>% 
   mutate(
-  TOT_stop_rule = rowSums(.[2:38])
+    TOT_rescore = rowSums(.[2:last_item+1])
   )
 
-# compare TOT_raw and TOT_stop_rule
- TOT_compare <- input_ID_raw_score %>% 
-  full_join(stop_data, by = 'IDnum') %>% 
-  select(IDnum, age_in_months, agestrat, TOT_raw, TOT_stop_rule) %>% 
+# compare TOT_raw and TOT_rescore
+TOT_compare <- input_ID_raw_score %>% 
+  full_join(rescore_data, by = 'IDnum') %>% 
+  select(IDnum, age_in_months, agestrat, TOT_raw, TOT_rescore) %>% 
   group_by(agestrat)
-  
+
 agestrat_corr_mean_diff <- TOT_compare %>% 
-  summarize(r = cor(TOT_raw, TOT_stop_rule),
-            mean_diff = mean(TOT_raw - TOT_stop_rule)) %>% 
+  summarize(r = cor(TOT_raw, TOT_rescore),
+            mean_diff = mean(TOT_raw - TOT_rescore)) %>% 
   mutate(r = round(r, 3),
          mean_diff = round(mean_diff, 3))
+
 
 
 
