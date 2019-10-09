@@ -128,37 +128,37 @@ freq_1streak <- output_basal %>%
     cum_per = round(100*(cumsum(n)/sum(n)), 4)
     )
 
-# after examining frequency table `freq_1streak`, designate a streak_length to
+# after examining frequency table `freq_1streak`, designate a streak_1_length to
 # implement for each case in the input data.
-streak_length <- 4
+streak_1_length <- 4
 
-# Next sequence gets start item for start rule of streak_length + 1 (meaning you
-# must get a win streak of streak_length + 1 in order to continue testing
+# Next sequence gets start item for start rule of streak_1_length + 1 (meaning you
+# must get a win streak of streak_1_length + 1 in order to continue testing
 # forward). Why is the start rule "+1"? Because the rule has stay active all the
-# way through this streak_length, so that it can catch the 0 above the streak.
+# way through this streak_1_length, so that it can catch the 0 above the streak.
 start_data <- input_tidy %>%
   # group_by(IDnum) allows you to find start item per case
   group_by(IDnum) %>% 
   # From the tidy input, label rows that contain correct responses (val = 1) and
-  # are part of a win streak equal to or greater than streak_length.
+  # are part of a win streak equal to or greater than streak_1_length.
   # runner::streak_run gets count, for each cell in val col, what is the current
   # length of streak of consecutive identical values?
   mutate(
     streak_x = case_when(
-      val == 1 & streak_run(val) >= streak_length ~ 1,
+      val == 1 & streak_run(val) >= streak_1_length ~ 1,
       TRUE ~ NA_real_
     ),
     # First step of isolating the start item: apply a label to only the last row
     # of streak_x, which you find by testing whether, in the lead row to any
     # row, the value of streak_x is NA. If that condition is true, then the
     # current row is the last correct response of streak_x. The label you apply
-    # is the column number that lags the row you chose by streak_length.
+    # is the column number that lags the row you chose by streak_1_length.
     # Start_item now holds the column number of the desired start item. Why?
-    # Because if your start rule is streak_length + 1, this is the item for
+    # Because if your start rule is streak_1_length + 1, this is the item for
     # which implementing that start rule guarantees that you will catch the next
     # 0 and be forced to test backwards to satisfy the start rule.
     start_item = case_when(
-      streak_x == 1 & is.na(lead(streak_x)) ~ col_num - streak_length,
+      streak_x == 1 & is.na(lead(streak_x)) ~ col_num - streak_1_length,
       TRUE ~ NA_real_
     )
   ) %>% 
@@ -166,22 +166,22 @@ start_data <- input_tidy %>%
   # isolate the rows that actually contain those items, which you accomplish by
   # selecting (filter) rows whose value of `col_num` equals the value of
   # `start_item`` in the row that leads (is ahead) of the row you want by
-  # streak_length. (Note that `streak_length` is passed as the second argument
+  # streak_1_length. (Note that `streak_1_length` is passed as the second argument
   # to `lead()` so that it retuns a row that leads by more than one row (default
   # would be leading by one row)). 
   
   # To understand the operation of the filter, generate and view the data object
   # up to this point in the pipeline, look for a row that contains a value for
-  # `start_item`, lag this row by streak_length, and you end up on the row that
+  # `start_item`, lag this row by streak_1_length, and you end up on the row that
   # contains the `col_num` corresponding to the desired start_item. You will see
   # that the value of `col_num` in the lagged row is identical to the value of
   # `start_item` in the row you started on.
-  filter(col_num == lead(start_item, streak_length)) %>% 
+  filter(col_num == lead(start_item, streak_1_length)) %>% 
   # recode start_item so that it contains the actual name of the start item,
   # which is found in column `col` from the tidy input.
   mutate(start_item = col) %>% 
   # At this point the data object contains a start item for each streak >=
-  # streak_length. We only want the last (highest) of these start items, because
+  # streak_1_length. We only want the last (highest) of these start items, because
   # that is the one that corresponds to the highest basal streak (so it will
   # yield a true basal). We use summarize() to return only the last start item
   # for each case (remember, the data object is already grouped by ID, so it can
@@ -290,19 +290,23 @@ freq_0streak <- output_ceiling %>%
     cum_per = round(100*(cumsum(n)/sum(n)), 4)
   )
 
-# START HERE: CREATE SEPARATE VARS FOR BASAL AND CEILING STREAK_LENGTH
+# after examining frequency table `freq_0streak`, designate a streak_0_length to
+# implement for each case in the input data.
+streak_0_length <- 4
 
-# Next sequence tests stop rule of streak_length + 1.
+# START HERE:
+
+# Next sequence tests stop rule of streak_0_length + 1.
 stop_data <- input_tidy %>%
-  # group_by(IDnum) allows you to find start item per case
+  # group_by(IDnum) allows you to find stop item per case
   group_by(IDnum) %>% 
   # From the tidy input, label rows that contain incorrect responses and are
-  # part of a losing streak equal to or greater than streak_length + 1.
+  # part of a losing streak equal to or greater than streak_0_length + 1.
   # runner::streak_run gets count, for each cell in val col, what is the current
   # length of streak of consecutive identical values?
   mutate(
     streak_x_0 = case_when(
-      val == 0 & streak_run(val) >= streak_length + 1 ~ 1,
+      val == 0 & streak_run(val) >= streak_0_length + 1 ~ 1,
       TRUE ~ NA_real_
     ),
     # First step of isolating the stop item: apply a label to only the first row
@@ -310,7 +314,7 @@ stop_data <- input_tidy %>%
     # of streak_x being NA. The label you apply is the column number, meaning
     # that `stop_item` now holds the column number of a stop item. However,
     # there may be more than one stop item per case, if there are multiple
-    # losing streaks of streak_length+1 within the case. We want the stop item
+    # losing streaks of streak_0_length+1 within the case. We want the stop item
     # to be the lowest of these streaks, because that provides the most
     # stringent test of equivalency between the basic input raw total score, and
     # the raw total score with stop rule applied.
@@ -320,15 +324,15 @@ stop_data <- input_tidy %>%
     )
     ) %>% 
   # To recode items to 0 above the stop item, we need all cells in `stop_item`,
-  # within each case, to hold the desired value of stop_item. We used two fill()
+  # within each case, to hold the desired value of stop_item. We use two fill()
   # steps to accomplish this, the first one replicating the existing value
   # (replacing NA) of stop_item down the table, within each case.
   fill(stop_item) %>% 
   # second fill step reverses direction and fills existing values going up the
   # table.
   fill(stop_item, .direction = "up") %>% 
-  # now we use `mutate()` to recode `stop_item` to its minimum vale per case, so
-  # the stop rule is applied after the lowest losing streak of streak_length+1.
+  # now we use `mutate()` to recode `stop_item` to its minimum value per case, so
+  # the stop rule is applied after the lowest losing streak of streak_0_length+1.
   # This recode step only affects cases that contain more than one value for
   # `stop_item`.
   mutate(stop_item = min(
