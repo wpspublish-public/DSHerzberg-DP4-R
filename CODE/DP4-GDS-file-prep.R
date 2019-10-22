@@ -19,7 +19,9 @@ list <- map(
   )
 )
 names(list) <-   c("DP4_interview_ADP_SS", "DP4_interview_COG_SS", "DP4_interview_COM_SS",
-                   "DP4_interview_PHY_SS", "DP4_interview_SOC_SS", "DP4_teacher_ADP_SS",  
+                   "DP4_interview_PHY_SS", "DP4_interview_SOC_SS", "DP4_parent_ADP_SS", 
+                   "DP4_parent_COG_SS", "DP4_parent_COM_SS",
+                   "DP4_parent_PHY_SS", "DP4_parent_SOC_SS", "DP4_teacher_ADP_SS",  
                    "DP4_teacher_COG_SS", "DP4_teacher_COM_SS", "DP4_teacher_PHY_SS",  
                    "DP4_teacher_SOC_SS")
 list2env(
@@ -28,14 +30,14 @@ list2env(
   )
 rm(list)
 
-teacher_SS_list <- list(
-  DP4_teacher_ADP_SS, 
-  DP4_teacher_COG_SS, 
-  DP4_teacher_COM_SS, 
-  DP4_teacher_PHY_SS,
-  DP4_teacher_SOC_SS)
+parent_SS_list <- list(
+  DP4_parent_ADP_SS, 
+  DP4_parent_COG_SS, 
+  DP4_parent_COM_SS, 
+  DP4_parent_PHY_SS,
+  DP4_parent_SOC_SS)
 
-teacher_SS <- teacher_SS_list %>% 
+parent_SS <- parent_SS_list %>% 
   reduce(
     left_join, 
     by = "ID"
@@ -47,17 +49,20 @@ teacher_SS <- teacher_SS_list %>%
          -contains('.')
          ) %>% 
   mutate(
-    GDS_teacher = rowSums(select(., contains("SS")))
+    GDS_parent = rowSums(select(., contains("SS")))
+  ) %>% 
+  filter(
+    !is.na(GDS_parent)
   )
-rm(teacher_SS_list)
+rm(parent_SS_list)
 
-teacher_SS %>% select(
+parent_SS %>% select(
   ID,
   agestrat,
-  GDS_teacher
+  GDS_parent
   ) %>% 
   write_csv(here(
-    'INPUT-FILES/TEACHER_norms-format_GDS.csv'
+    'INPUT-FILES/PARENT_norms-format_GDS.csv'
   )
 )
 

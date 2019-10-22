@@ -7,7 +7,8 @@ Cognitive (COG): 0-42
 Communication (COM): 0-34
 Physical (PHY): 0-37
 Social-Emotional (SOC): 0-36
-GDS: 200-757
+Interview GDS: 200-757
+Parent GDS: 211-800
 
 
 # Teacher forms:
