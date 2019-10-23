@@ -229,7 +229,7 @@ hist_plot <-
   ggplot(data = hist_data, aes(start)) +
   stat_count(width = 0.5) +
   scale_y_continuous(breaks = seq(0, 100, 5)) +
-  labs(title = "Frequency Distribution", x = "Each bin is a count of a specific Total Score value", y = "Each histogram is an agestrat") +
+  labs(title = "Frequency Distribution", x = "Each bin is a count of a start item", y = "Each histogram is an agestrat") +
   facet_wrap( ~ agestrat)
 print(hist_plot)
 
