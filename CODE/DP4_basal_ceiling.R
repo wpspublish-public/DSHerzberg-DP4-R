@@ -103,7 +103,7 @@ output_basal <- input[,1] %>%
               #
               # More detail on how the filter works: it catches rows that 1)
               # represent a 1 score on an item (val = 1); 2) are part of the
-              # string of consecutive 1 scores (val = 1) that appear obove a 0
+              # string of consecutive 1 scores (val = 1) that appear obove an 0
               # response for that IDnum (lag(val, default = 1) == 0) -- lag gets
               # the value of val from the row preceding the current row, so when
               # that value is 0, lag will catch it; default = 1 deals with first
