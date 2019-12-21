@@ -2,11 +2,11 @@ suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
 
-file_name <- c('TEMP_Norms_RawtoSS_InterviewForm_ITTables_DH SPECS')
+file_name <- c('Norms_RawtoSS_InterviewForm_ITTables_DH SPECS')
 
 # express the directory path to the input file as a string.
 path <- here(
-paste0('INPUT-FILES/', file_name, '.xlsx'))
+paste0('INPUT-FILES/OES-TABLES/', file_name, '.xlsx'))
 
 # input file is multi-tabbed .xlsx. Tabs contain lookup tables for each
 # agestrat. read input file into a df, stacking tabs on top of one another, and
