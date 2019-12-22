@@ -27,7 +27,16 @@ str_sub(temp2$agestrat, 4)  <- str_sub(temp2$agestrat, 4) %>%
 temp3 <- temp2 %>% 
   gather('scale', 'SS', -agestrat, -rawscore) %>%
   arrange(scale, agestrat) %>% 
-  select(scale, agestrat, rawscore, SS)
+  select(scale, agestrat, rawscore, SS) %>% 
+  drop_na(SS) %>% 
+  mutate(descrange = case_when(
+    SS >= 131 ~ 'Well above average',
+    between(SS, 116, 130) ~ 'Above average',
+    between(SS, 85, 115) ~ 'Average',
+    between(SS, 70, 84) ~ 'Below average',
+    SS <= 69 ~ 'Delayed',
+    TRUE ~ NA_character_
+  ))
 
 
 
