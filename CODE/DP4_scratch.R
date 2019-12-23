@@ -4,6 +4,8 @@ suppressMessages(library(readxl))
 
 file_name <- c('Norms_RawtoSS_InterviewForm_ITTables_DH SPECS')
 
+perc_lookup <- suppressMessages(read_csv(here('INPUT-FILES/Percentile-Lookup-SS.csv')))
+
 # express the directory path to the input file as a string.
 path <- here(
 paste0('INPUT-FILES/OES-TABLES/', file_name, '.xlsx'))
@@ -26,9 +28,8 @@ str_sub(temp2$agestrat, 4)  <- str_sub(temp2$agestrat, 4) %>%
 # are nested within each value of agestrat.
 temp3 <- temp2 %>% 
   gather('scale', 'SS', -agestrat, -rawscore) %>%
+  right_join(perc_lookup, by = 'SS') %>% 
   arrange(scale, agestrat) %>% 
-  select(scale, agestrat, rawscore, SS) %>% 
-  drop_na(SS) %>% 
   mutate(descrange = case_when(
     SS >= 131 ~ 'Well above average',
     between(SS, 116, 130) ~ 'Above average',
@@ -36,7 +37,6 @@ temp3 <- temp2 %>%
     between(SS, 70, 84) ~ 'Below average',
     SS <= 69 ~ 'Delayed',
     TRUE ~ NA_character_
-  ))
-
-
-
+  )) %>% 
+  select(scale, agestrat, rawscore, SS, descrange, Percentile)
+  
