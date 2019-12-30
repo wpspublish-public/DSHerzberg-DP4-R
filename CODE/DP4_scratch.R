@@ -28,6 +28,27 @@ path %>%
 str_sub(input_lookup$agestrat, 4)  <- str_sub(input_lookup$agestrat, 4) %>% 
   str_pad(3, side = 'left', '0') 
 
+# erstatz GDS lookup
+input_GDS <- tribble(
+  ~rawscore, ~GDS,
+  500, 98,
+  501, 99,
+  502, 100,
+  503, 101,
+  504, 102
+)
+
+# extract agestrat values into df
+agestrat <- unique(input_lookup$agestrat)
+agestrat1 <- enframe(agestrat) %>% 
+  select(value) %>% 
+  rename(agestrat = value)
+
+# new df that nests input_GDS within values of agestrat, tidyr::crossing is used
+# because inputs have now common vars
+agestrat_GDS <- crossing(agestrat1, input_GDS)
+
+
 # Transform input table so that subscales and their associated raw-to-SS lookups
 # are nested within each value of agestrat.
 input_lookup %>% 
@@ -50,4 +71,7 @@ lookup_list <- file_name %>% map(lookup)
 interview_lookup <- lookup_list[[1]]
 parent_lookup <- lookup_list[[2]]
 teacher_lookup <- lookup_list[[3]]
+
+test <- full_join(input_lookup, agestrat_GDS, by = c('agestrat', 'rawscore')) %>% 
+  arrange(agestrat)
 
