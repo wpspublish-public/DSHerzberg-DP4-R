@@ -6,7 +6,12 @@ file_name <- c('Norms_RawtoSS_InterviewForm_ITTables_DH SPECS',
                'Norms_RawtoSS_ParentChecklist_ITTables_DH SPECS',
                'Norms_RawtoSS_TeacherNorms_ITTables_DH SPECS')
 
+# read in percentile lookup column
 perc_lookup <- suppressMessages(read_csv(here('INPUT-FILES/Percentile-Lookup-SS.csv')))
+
+# read in age labels for OES output lookup table
+age_labels <- suppressMessages(read_csv(here('INPUT-FILES/OES-TABLES/OES-age-labels.csv'))) %>%
+  mutate(agestrat = str_sub(agestrat, 4))
 
 lookup <- function(x) {
   # express the directory path to the input file as a string.
@@ -82,14 +87,18 @@ lookup_list <- file_name %>%
   map(lookup) %>% 
   setNames(form)
 
-interview_lookup <- lookup_list[[1]] %>% 
-  mutate(form = 'interview') %>%
-  select(form, everything()) 
-parent_lookup <- lookup_list[[2]] %>% 
-  mutate(form = 'parent') %>%
-  select(form, everything()) 
-teacher_lookup <- lookup_list[[3]] %>% 
-  mutate(form = 'teacher') %>%
-  select(form, everything()) 
+# use purr::imap() to apply a function to both a list and its index (in a named
+# list the index is the names of the elements)
+lookup_list_mod <- imap(lookup_list, ~.x %>% mutate(form = .y) %>% select(form, everything()))
 
-all_lookup <- bind_rows(interview_lookup, parent_lookup, teacher_lookup)
+# give the modified dfs new names, and extract them from the list using
+# base::list2env
+names(lookup_list_mod) <- paste0(names(lookup_list_mod), '_lookup')
+list2env(lookup_list_mod, .GlobalEnv)
+
+all_lookup <- bind_rows(interview_lookup, parent_lookup, teacher_lookup) %>%
+  left_join(age_labels, by = 'agestrat') %>%
+  select(-agestrat) %>%
+  rename(agestrat = OES_label) %>%
+  select(form, scale, agestrat, rawscore, SS, descrange, Percentile)
+

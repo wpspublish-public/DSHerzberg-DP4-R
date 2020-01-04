@@ -1,0 +1,31 @@
+agestrat,OES_label
+mo_000,Birth to 1 month
+mo_002,2 months to 3 months
+mo_004,4 months to 5 months
+mo_006,6 months to 7 months
+mo_008,8 months to 9 months
+mo_010,10 months to 11 months
+mo_012,12 months to 13 months
+mo_014,14 months to 15 months
+mo_016,16 months to 17 months
+mo_018,18 months to 19 months
+mo_020,20 months to 21 months
+mo_022,22 months to 23 months
+mo_024,"2 years, 0 months to 2 years, 3 months"
+mo_028,"2 years, 4 months to 2 years, 7 months"
+mo_032,"2 years, 8 months to 2 years, 11 months"
+mo_036,"3 years, 0 months to 3 years, 5 months"
+mo_042,"3 years, 6 months to 3 years 11 months"
+mo_048,"4 years, 0 months to 4 years, 5 months"
+mo_054,"4 years, 6 months to 4 years, 11 months"
+mo_060,"5 years, 0 months to 5 years, 5 months"
+mo_066,"5 years, 6 months to 5 years, 11 months"
+mo_072,"6 years, 0 months to 6 years, 5 months"
+mo_078,"6 years, 6 months to 6 years, 11 months"
+mo_084,"7 years, 0 months to 7 years, 11 months"
+mo_096,"8 years, 0 months to 8 years, 11 months"
+mo_108,"9 years, 0 months to 9 years, 11 months"
+mo_120,"10 years, 0 months to 10 years, 11 months"
+mo_132,"11 years, 0 months to 12 years, 11 months"
+mo_156,"13 years, 0 months to 16 years, 11 months"
+mo_204,"17 years, 0 months to 21 years, 11 months"
