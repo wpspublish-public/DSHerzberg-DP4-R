@@ -2,59 +2,84 @@ suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
 
-file_name <- c('Norms_RawtoSS_InterviewForm_ITTables_DH SPECS',
-               'Norms_RawtoSS_ParentChecklist_ITTables_DH SPECS',
-               'Norms_RawtoSS_TeacherNorms_ITTables_DH SPECS')
+form <- c('interview', 'parent', 'teacher')
 
+# Create char vec holding names of input .xlsx containing scale lookups.
+# `purrr::map_chr()` returns a char vec. Mapping `paste0()` allows you to paste
+# the names of the three forms into the file name stem, creating charvec with
+# three file names.
+scale_file_name <- map_chr(form, ~ paste0('scale_lookup_', .x))
+
+# read in percentile lookup column
 perc_lookup <- suppressMessages(read_csv(here('INPUT-FILES/Percentile-Lookup-SS.csv')))
 
-lookup <- function(x) {
-# express the directory path to the input file as a string.
-path <- here(
-paste0('INPUT-FILES/OES-TABLES/', x, '.xlsx'))
+# read in age labels for OES output lookup table
+age_labels <- suppressMessages(read_csv(here('INPUT-FILES/OES-TABLES/OES-age-labels.csv'))) %>%
+  mutate(agestrat = str_sub(agestrat, 4))
 
-# input file is multi-tabbed .xlsx. Tabs contain lookup tables for each
-# agestrat. read input file into a df, stacking tabs on top of one another, and
-# creating a new column 'agestrat' to identify the origin tab of each set of rows.
-path %>% 
+scale_readin <- function(x) {
+  # express the directory path to the input file as a string.
+  here(
+    paste0('INPUT-FILES/OES-TABLES/', x, '.xlsx')) %>%
+    assign('path', ., envir = .GlobalEnv)
+  
+  
+  # input file is multi-tabbed .xlsx. Tabs contain lookup tables for each
+  # agestrat. read input file into a df, stacking tabs on top of one another, and
+  # creating a new column 'agestrat' to identify the origin tab of each set of rows.
+  path %>% 
+    excel_sheets() %>%
+    set_names() %>%
+    map_df(read_excel,
+           path = path,
+           .id = 'agestrat') %>% 
+    assign('input_lookup_pre', ., envir = .GlobalEnv)
+  
+  # recode agestrat so that it will sort properly
+  input_lookup_pre %>%  mutate(agestrat_x = str_sub(agestrat, 4) %>% 
+                                 str_pad(3, side = 'left', '0')) %>% 
+    select(-agestrat) %>% 
+    rename(agestrat = agestrat_x) %>% 
+    assign('input_lookup', ., envir = .GlobalEnv)
+}
+
+scale_lookup <- scale_file_name %>% 
+  map(scale_readin) %>% 
+  setNames(form) %>% 
+  bind_rows(.id = 'form')
+
+
+# Read in GDS .xlsx, using same general method, but without requiring a function
+GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>% 
   excel_sheets() %>%
   set_names() %>%
   map_df(read_excel,
-      path = path,
-      .id = 'agestrat') %>% 
-  assign('input_lookup', ., envir = .GlobalEnv)
+         path = here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx'),
+         .id = 'form') %>% 
+  # to nest form-rawscore-GDS triplets within values of agestrat, tidyr::crossing is used
+  # because inputs have no common vars
+  crossing(age_labels, .) %>% 
+  filter(!(form == 'teacher' & agestrat %in% c("000", "002", "004", "006", "008", 
+                         "010", "012", "014", "016", "018",
+                         "020", "022"))) %>% 
+  select(form, rawscore, GDS, agestrat)
 
-# recode agestrat so that it will sort properly
-str_sub(input_lookup$agestrat, 4)  <- str_sub(input_lookup$agestrat, 4) %>% 
-  str_pad(3, side = 'left', '0') 
+# Read in CV .xlsx
+CV_lookup <- here('INPUT-FILES/OES-TABLES/GForm-Agestrat-CV.xlsx') %>% 
+  excel_sheets() %>%
+  set_names() %>%
+  map_df(read_excel,
+         path = here('INPUT-FILES/OES-TABLES/Form-Agestrat-CV.xlsx'),
+         .id = 'form') %>% 
+  
 
-# erstatz GDS lookup
-input_GDS <- tribble(
-  ~rawscore, ~GDS,
-  500, 98,
-  501, 99,
-  502, 100,
-  503, 101,
-  504, 102
-)
-
-# extract agestrat values into df
-agestrat <- unique(input_lookup$agestrat)
-agestrat1 <- enframe(agestrat) %>% 
-  select(value) %>% 
-  rename(agestrat = value)
-
-# new df that nests input_GDS within values of agestrat, tidyr::crossing is used
-# because inputs have now common vars
-agestrat_GDS <- crossing(agestrat1, input_GDS)
-
-
-# Transform input table so that subscales and their associated raw-to-SS lookups
-# are nested within each value of agestrat.
-input_lookup %>% 
-  gather('scale', 'SS', -agestrat, -rawscore) %>%
+# Assemble OES output table
+scale_GDS_lookup <- scale_lookup %>% 
+  full_join(GDS_lookup, by = c('agestrat', 'form', 'rawscore')) %>% 
+  gather('scale', 'SS', -agestrat, -rawscore, -form) %>% 
+  # This drops rows that are NA on SS, which shouldn't exist on final output table.
+  drop_na() %>% 
   right_join(perc_lookup, by = 'SS') %>% 
-  arrange(scale, agestrat) %>% 
   mutate(descrange = case_when(
     SS >= 131 ~ 'Well above average',
     between(SS, 116, 130) ~ 'Above average',
@@ -63,15 +88,7 @@ input_lookup %>%
     SS <= 69 ~ 'Delayed',
     TRUE ~ NA_character_
   )) %>% 
-  select(scale, agestrat, rawscore, SS, descrange, Percentile)
-}
+  select(scale, form, agestrat, rawscore, SS, descrange, Percentile) %>% 
+  arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), form, agestrat) 
 
-lookup_list <- file_name %>% map(lookup)
-
-interview_lookup <- lookup_list[[1]]
-parent_lookup <- lookup_list[[2]]
-teacher_lookup <- lookup_list[[3]]
-
-test <- full_join(input_lookup, agestrat_GDS, by = c('agestrat', 'rawscore')) %>% 
-  arrange(agestrat)
 

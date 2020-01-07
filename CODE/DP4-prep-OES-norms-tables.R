@@ -2,9 +2,11 @@ suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
 
-file_name <- c('Norms_RawtoSS_InterviewForm_ITTables_DH SPECS',
-               'Norms_RawtoSS_ParentChecklist_ITTables_DH SPECS',
-               'Norms_RawtoSS_TeacherNorms_ITTables_DH SPECS')
+file_name <- c('scale_lookup_interview',
+               'scale_lookup_parent',
+               'scale_lookup_teacher')
+
+form <- c('interview', 'parent', 'teacher')
 
 # read in percentile lookup column
 perc_lookup <- suppressMessages(read_csv(here('INPUT-FILES/Percentile-Lookup-SS.csv')))
@@ -80,8 +82,6 @@ tribble(
     )) %>% 
     select(scale, agestrat, rawscore, SS, descrange, Percentile)
 }
-
-form <- c('interview', 'parent', 'teacher')
 
 lookup_list <- file_name %>% 
   map(lookup) %>% 
