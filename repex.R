@@ -1,30 +1,49 @@
 suppressMessages(library(tidyverse))
 
-# create data
-table_names <- c('dfA', 'dfB', 'dfC')
+Here is data:
 
-dfA <- tibble(a = 1:3, b = 4:6, c = 7:9)
-dfB <- tibble(a = 10:12, b = 13:15, c = 16:18)
-dfC <- tibble(a = 19:21, b = 22:24, c = 25:27)
-df_list <- list(dfA, dfB, dfC) %>% setNames(table_names)
+```  
+col_pre <- c('a', 'b', 'c')
+df <- tibble(a1 = 1:3, a2 = 4:6, b1 = 7:9, b2 = 10:12, c1 = 13:15, c2 = 16:18)
+```
 
-# function: this this expresses the required transformations for a single df
-# dfA_mod <- df_list$dfA %>% 
-#   mutate(name = 'dfA') %>%
-#   select(name, everything()) 
+I want to use `purrr::map()` and `dplyr::mutate()` to create three new columns that are the sums of columns in `df`.
+I can use `map()` to iterate over a vector of the a, b, c column prefixes. I figured out the `tidyeval` operations so that 
+the code below runs without error.
 
-# stack overflow answer: use purr::imap() to apply a function to both a list and
-# its index (in a named list the index is the names of the elements)
-df_out <- imap(df_list, ~.x %>% mutate(name = .y) %>% select(name, everything()))
+```
+library(tidyverse)
+out <- col_pre %>%
+  map_df(~ df %>% 
+            mutate(!!as.name(paste0(.x, '3')) := !!as.name(paste0(.x, '1')) + !!as.name(paste0(.x, '2')))
+  )
+```
+However, `out` now has six spurious rows:
+  
+```
+     a1    a2    b1    b2    c1    c2    a3    b3    c3
+1     1     4     7    10    13    16     5    NA    NA
+2     2     5     8    11    14    17     7    NA    NA
+3     3     6     9    12    15    18     9    NA    NA
+4     1     4     7    10    13    16    NA    17    NA
+5     2     5     8    11    14    17    NA    19    NA
+6     3     6     9    12    15    18    NA    21    NA
+7     1     4     7    10    13    16    NA    NA    29
+8     2     5     8    11    14    17    NA    NA    31
+9     3     6     9    12    15    18    NA    NA    33
+```
 
-# here's how to give the modified dfs new names, and extract them from the list
-# using base::list2env
-names(df_out) <- paste0(names(df_out), "_mod")
-list2env(df_out, .GlobalEnv)
+What it done is unnecessarily replicate the three rows of the input `df`.
 
-# more options from SO, both stack all three dfs with a new `name` column in the
-# far left position
-map_dfr(df_list, I, .id = 'name')
+Here is the output I want:
+  
+```
+     a1    a2    b1    b2   c1    c2    a3     b3    c3
+1     1     4     7    10    13    16     5    17    29
+2     2     5     8    11    14    17     7    19    31
+3     3     6     9    12    15    18     9    21    33
+```
 
-bind_rows(df_list, .id = 'name')
+I have a feeling `purrr::reduce()` could be the solution, but I'm unsure how to apply it'.
 
+Any help is appreciated!

@@ -3,6 +3,7 @@ suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
 
 form <- c('interview', 'parent', 'teacher')
+scale_acr <- c('PHY', 'ADP', 'SOC', 'COG', 'COM')
 
 # Create char vec holding names of input .xlsx containing scale lookups.
 # `purrr::map_chr()` returns a char vec. Mapping `paste0()` allows you to paste
@@ -79,7 +80,26 @@ CV_95_lookup <- CV_lookup %>%
 
 scale_CV_lookup <- list(scale_lookup, CV_90_lookup, CV_95_lookup) %>% 
   reduce(left_join, by = c('form', 'agestrat')) %>% 
-  # now write function to create CV variables.
+  mutate(PHY_CI90_LB = as.character(PHY-PHY_CV90),
+         PHY_CI90_UB = as.character(PHY+PHY_CV90),
+         PHY_CI90 = str_c(PHY_CI90_LB, PHY_CI90_UB, sep = ' - '))
+  
+
+test <- scale_acr %>%
+  map_dfc(~ scale_CV_lookup %>% 
+        mutate(!!as.name(paste0(.x, '_CI90_LB')) := as.character(!!as.name(.x)-!!as.name(paste0(.x, '_CV90'))),
+               !!as.name(paste0(.x, '_CI90_UB')) := as.character(!!as.name(.x)+!!as.name(paste0(.x, '_CV90'))))
+               # !!as.name(paste0(.x, 'PHY_CI90')) :=
+               #   str_c(!!as.name(paste0(.x, '_CI90_LB')), !!as.name(paste0(.x, '_CI90_UB')), sep = ' - '))
+  )
+
+test <- 
+  map_dfc(scale_acr, ~ scale_CV_lookup %>% 
+           mutate(!!as.name(paste0(.x, '_CI90_LB')) := as.character(!!as.name(.x)-!!as.name(paste0(.x, '_CV90'))),
+                  !!as.name(paste0(.x, '_CI90_UB')) := as.character(!!as.name(.x)+!!as.name(paste0(.x, '_CV90'))))
+         # !!as.name(paste0(.x, 'PHY_CI90')) :=
+         #   str_c(!!as.name(paste0(.x, '_CI90_LB')), !!as.name(paste0(.x, '_CI90_UB')), sep = ' - '))
+  )
 
 
 
