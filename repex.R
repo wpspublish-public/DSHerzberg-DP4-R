@@ -47,3 +47,11 @@ Here is the output I want:
 I have a feeling `purrr::reduce()` could be the solution, but I'm unsure how to apply it'.
 
 Any help is appreciated!
+  
+  # SO solution
+  
+  col_pre %>%
+  map_dfc(~ df %>%
+            transmute(!! str_c(.x, '3') :=  !! rlang::sym(str_c(.x, '1'))  + 
+                        !! rlang::sym(str_c(.x, 2)))) %>%
+  bind_cols(df, .)

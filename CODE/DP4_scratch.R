@@ -1,6 +1,7 @@
 suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
+suppressMessages(library(rlang))
 
 form <- c('interview', 'parent', 'teacher')
 scale_acr <- c('PHY', 'ADP', 'SOC', 'COG', 'COM')
@@ -79,28 +80,25 @@ CV_95_lookup <- CV_lookup %>%
   select(-CV_type)
 
 scale_CV_lookup <- list(scale_lookup, CV_90_lookup, CV_95_lookup) %>% 
-  reduce(left_join, by = c('form', 'agestrat')) %>% 
-  mutate(PHY_CI90_LB = as.character(PHY-PHY_CV90),
-         PHY_CI90_UB = as.character(PHY+PHY_CV90),
-         PHY_CI90 = str_c(PHY_CI90_LB, PHY_CI90_UB, sep = ' - '))
-  
+  reduce(left_join, by = c('form', 'agestrat'))
 
-test <- scale_acr %>%
+scale_CI_lookup <- scale_acr %>%
   map_dfc(~ scale_CV_lookup %>% 
-        mutate(!!as.name(paste0(.x, '_CI90_LB')) := as.character(!!as.name(.x)-!!as.name(paste0(.x, '_CV90'))),
-               !!as.name(paste0(.x, '_CI90_UB')) := as.character(!!as.name(.x)+!!as.name(paste0(.x, '_CV90'))))
-               # !!as.name(paste0(.x, 'PHY_CI90')) :=
-               #   str_c(!!as.name(paste0(.x, '_CI90_LB')), !!as.name(paste0(.x, '_CI90_UB')), sep = ' - '))
-  )
-
-test <- 
-  map_dfc(scale_acr, ~ scale_CV_lookup %>% 
-           mutate(!!as.name(paste0(.x, '_CI90_LB')) := as.character(!!as.name(.x)-!!as.name(paste0(.x, '_CV90'))),
-                  !!as.name(paste0(.x, '_CI90_UB')) := as.character(!!as.name(.x)+!!as.name(paste0(.x, '_CV90'))))
-         # !!as.name(paste0(.x, 'PHY_CI90')) :=
-         #   str_c(!!as.name(paste0(.x, '_CI90_LB')), !!as.name(paste0(.x, '_CI90_UB')), sep = ' - '))
-  )
-
+            # dplyr::transmute() is similar to mutate(), but it drops the input
+            # columns after creating the new var
+            transmute(
+              !!str_c(.x, '_CI90_LB') := as.character(!!sym(.x) - !!sym(str_c(.x, '_CV90'))),
+              !!str_c(.x, '_CI90_UB') := as.character(!!sym(.x) + !!sym(str_c(.x, '_CV90'))), 
+              !!str_c(.x, '_CI90') :=
+                str_c(!!sym(str_c(.x, '_CI90_LB')), !!sym(str_c(.x, '_CI90_UB')), sep = ' - '),
+              !!str_c(.x, '_CI95_LB') := as.character(!!sym(.x) - !!sym(str_c(.x, '_CV95'))),
+              !!str_c(.x, '_CI95_UB') := as.character(!!sym(.x) + !!sym(str_c(.x, '_CV95'))), 
+              !!str_c(.x, '_CI95') :=
+                str_c(!!sym(str_c(.x, '_CI95_LB')), !!sym(str_c(.x, '_CI95_UB')), sep = ' - ')
+            )
+  ) %>%
+  bind_cols(scale_CV_lookup, .) %>% 
+  select(form:COM, ends_with('CI90'), ends_with('CI95'))
 
 
 # Read in GDS .xlsx, using same general method, but without requiring a function
@@ -116,7 +114,11 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
   filter(!(form == 'teacher' & agestrat %in% c("000", "002", "004", "006", "008", 
                          "010", "012", "014", "016", "018",
                          "020", "022"))) %>% 
-  select(form, rawscore, GDS, agestrat)
+  select(form, rawscore, GDS, agestrat) %>% 
+  # add CIs - the CVs are constant across all forms and agestrats
+  mutate(GDS_CI90 = str_c(as.character(GDS - 9), as.character(GDS + 9), sep = ' - '),
+         GDS_CI95 = str_c(as.character(GDS - 12), as.character(GDS + 12), sep = ' - ')
+         )
 
 
 
@@ -137,5 +139,4 @@ scale_GDS_lookup <- scale_lookup %>%
   )) %>% 
   select(scale, form, agestrat, rawscore, SS, descrange, Percentile) %>% 
   arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), form, agestrat) 
-
 
