@@ -1,7 +1,6 @@
 suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
-suppressMessages(library(rlang))
 
 form <- c('interview', 'parent', 'teacher')
 scale_acr <- c('PHY', 'ADP', 'SOC', 'COG', 'COM')
@@ -87,16 +86,40 @@ scale_CI_lookup <- scale_acr %>%
             # dplyr::transmute() is similar to mutate(), but it drops the input
             # columns after creating the new var
             transmute(
-              !!str_c(.x, '_CI90_LB') := as.character(!!sym(.x) - !!sym(str_c(.x, '_CV90'))),
-              !!str_c(.x, '_CI90_UB') := as.character(!!sym(.x) + !!sym(str_c(.x, '_CV90'))), 
+              # Next four operations lines get upper, lower bounds of CIs as numbers
+              !!str_c(.x, '_CI90_LB_pre') := !!sym(.x) - !!sym(str_c(.x, '_CV90')),
+              !!str_c(.x, '_CI90_UB_pre') := !!sym(.x) + !!sym(str_c(.x, '_CV90')), 
+              !!str_c(.x, '_CI95_LB_pre') := !!sym(.x) - !!sym(str_c(.x, '_CV95')),
+              !!str_c(.x, '_CI95_UB_pre') := !!sym(.x) + !!sym(str_c(.x, '_CV95')), 
+              # Next four operations truncate UB at 160, LB at 40, and coerce
+              # both to character
+              !!str_c(.x, '_CI90_LB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI90_LB_pre')) < 40 ~ 40,
+                TRUE ~ !!sym(str_c(.x, '_CI90_LB_pre'))
+              )),
+              !!str_c(.x, '_CI90_UB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI90_UB_pre')) > 160 ~ 160,
+                TRUE ~ !!sym(str_c(.x, '_CI90_UB_pre'))
+              )),
+              !!str_c(.x, '_CI95_LB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI95_LB_pre')) < 40 ~ 40,
+                TRUE ~ !!sym(str_c(.x, '_CI95_LB_pre'))
+              )),
+              !!str_c(.x, '_CI95_UB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI95_UB_pre')) > 160 ~ 160,
+                TRUE ~ !!sym(str_c(.x, '_CI95_UB_pre'))
+              )),
+              # Next two operations yield the formatted, truncated CIs as strings
               !!str_c(.x, '_CI90') :=
                 str_c(!!sym(str_c(.x, '_CI90_LB')), !!sym(str_c(.x, '_CI90_UB')), sep = ' - '),
-              !!str_c(.x, '_CI95_LB') := as.character(!!sym(.x) - !!sym(str_c(.x, '_CV95'))),
-              !!str_c(.x, '_CI95_UB') := as.character(!!sym(.x) + !!sym(str_c(.x, '_CV95'))), 
               !!str_c(.x, '_CI95') :=
                 str_c(!!sym(str_c(.x, '_CI95_LB')), !!sym(str_c(.x, '_CI95_UB')), sep = ' - ')
             )
   ) %>%
+  # At this point the object has only the new columns; all input columns have
+  # been dropped by transmute(). Now bind_cols joins the new cols with the
+  # original input set. select() then pares to only those columsn needed in the
+  # final OES output.
   bind_cols(scale_CV_lookup, .) %>% 
   select(form:COM, ends_with('CI90'), ends_with('CI95'))
 
@@ -116,9 +139,22 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
                          "020", "022"))) %>% 
   select(form, rawscore, GDS, agestrat) %>% 
   # add CIs - the CVs are constant across all forms and agestrats
-  mutate(GDS_CI90 = str_c(as.character(GDS - 9), as.character(GDS + 9), sep = ' - '),
-         GDS_CI95 = str_c(as.character(GDS - 12), as.character(GDS + 12), sep = ' - ')
-         )
+  mutate(GDS_CI90_LB = case_when(
+    GDS - 9 < 40 ~ 40,
+    TRUE ~ GDS - 9),
+    GDS_CI90_UB = case_when(
+      GDS + 9 > 160 ~ 160,
+      TRUE ~ GDS + 9),
+    GDS_CI95_LB = case_when(
+      GDS - 12 < 40 ~ 40,
+      TRUE ~ GDS - 12),
+    GDS_CI95_UB = case_when(
+      GDS + 12 > 160 ~ 160,
+      TRUE ~ GDS + 12),
+    GDS_CI90 = str_c(as.character(GDS_CI90_LB), as.character(GDS_CI90_UB), sep = ' - '),
+    GDS_CI95 = str_c(as.character(GDS_CI95_LB), as.character(GDS_CI95_UB), sep = ' - ')
+         ) %>% 
+  select(form, agestrat, rawscore, GDS, GDS_CI90, GDS_CI95)
 
 
 
@@ -139,4 +175,5 @@ scale_GDS_lookup <- scale_lookup %>%
   )) %>% 
   select(scale, form, agestrat, rawscore, SS, descrange, Percentile) %>% 
   arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), form, agestrat) 
+
 
