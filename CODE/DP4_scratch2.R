@@ -1,53 +1,56 @@
-test <- scale_CV_lookup %>%
-  transmute(
-    PHY_CI90_UB = PHY + PHY_CV90,
-    PHY_CI90_UB_trunc = case_when(
-      PHY_CI90_UB > 160 ~ 160,
-      TRUE ~ PHY_CI90_UB
-    ) 
-    ) 
+suppressMessages(library(tidyverse))
 
+input <- tribble(
+~age, ~score, ~COG_SS, ~COG_CI, ~EMO_SS, ~EMO_CI,
+1, 10, 98, '93-103', 100, '95-105',
+1, 15, 107, '102-112', 109, '104-114',
+1, 20, 114, '109-119', 118, '113-123',
+2, 10, 94, '89-99', 97, '92-102',
+2, 15, 103, '98-108', 103, '98-108',
+2, 20, 109, '104-114', 114, '109-119'
+)
 
+out_temp <- input %>%
+  gather(key, val, 3:ncol(.)) %>%
+  extract(key, into = c("scale", "type"), "([:alpha:]{3})?\\_?(.*)") %>%
+  spread(type, val) %>% 
+  select(scale, age, score, SS, CI) %>% 
+  arrange(scale) %>% 
+  mutate(SS = as.numeric(SS))
 
-    
-scale_CI_lookup <- scale_acr %>%
-  map_dfc(~ scale_CV_lookup %>% 
-            # dplyr::transmute() is similar to mutate(), but it drops the input
-            # columns after creating the new var
-            transmute(
-              # Next four operations lines get upper, lower bounds of CIs as numbers
-              !!str_c(.x, '_CI90_LB_pre') := !!sym(.x) - !!sym(str_c(.x, '_CV90')),
-              !!str_c(.x, '_CI90_UB_pre') := !!sym(.x) + !!sym(str_c(.x, '_CV90')), 
-              !!str_c(.x, '_CI95_LB_pre') := !!sym(.x) - !!sym(str_c(.x, '_CV95')),
-              !!str_c(.x, '_CI95_UB_pre') := !!sym(.x) + !!sym(str_c(.x, '_CV95')), 
-              # Next four operations truncate UB at 160, LB at 40, and coerce
-              # both to character
-              !!str_c(.x, '_CI90_LB') := as.character(case_when(
-                !!sym(str_c(.x, '_CI90_LB_pre')) < 40 ~ 40,
-                TRUE ~ !!sym(str_c(.x, '_CI90_LB_pre'))
-              )),
-              !!str_c(.x, '_CI90_UB') := as.character(case_when(
-                !!sym(str_c(.x, '_CI90_UB_pre')) > 160 ~ 160,
-                TRUE ~ !!sym(str_c(.x, '_CI90_UB_pre'))
-              )),
-              !!str_c(.x, '_CI95_LB') := as.character(case_when(
-                !!sym(str_c(.x, '_CI95_LB_pre')) < 40 ~ 40,
-                TRUE ~ !!sym(str_c(.x, '_CI95_LB_pre'))
-              )),
-              !!str_c(.x, '_CI95_UB') := as.character(case_when(
-                !!sym(str_c(.x, '_CI95_UB_pre')) > 160 ~ 160,
-                TRUE ~ !!sym(str_c(.x, '_CI95_UB_pre'))
-              )),
-              # Next two operations yield the formatted, truncated CIs as strings
-              !!str_c(.x, '_CI90') :=
-                str_c(!!sym(str_c(.x, '_CI90_LB')), !!sym(str_c(.x, '_CI90_UB')), sep = ' - '),
-              !!str_c(.x, '_CI95') :=
-                str_c(!!sym(str_c(.x, '_CI95_LB')), !!sym(str_c(.x, '_CI95_UB')), sep = ' - ')
-            )
-          ) %>%
-  # At this point the object has only the new columns; all input columns have
-  # been dropped by transmute(). Now bind_cols joins the new cols with the
-  # original input set. select() then pares to only those columsn needed in the
-  # final OES output.
-  bind_cols(scale_CV_lookup, .) %>% 
-  select(form:COM, ends_with('CI90'), ends_with('CI95'))
+output <- tribble(
+  ~scale, ~age, ~score, ~SS, ~CI,
+  'COG', 1, 10, 98, '93-103',
+  'COG', 1, 15, 107, '102-112',
+  'COG', 1, 20, 114, '109-119',
+  'COG', 2, 10, 94, '89-99',
+  'COG', 2, 15, 103, '98-108',
+  'COG', 2, 20, 109, '104-114',
+  'EMO', 1, 10, 100, '95-105',
+  'EMO', 1, 15, 109, '104-114',
+  'EMO', 1, 20, 118, '113-123',
+  'EMO', 2, 10, 97, '92-102',
+  'EMO', 2, 15, 103, '98-108',
+  'EMO', 2, 20, 114, '109-119'
+)
+
+set.seed(1238289)
+testdf=data.frame(FY=c("FY13","FY14","FY15","FY14","FY15","FY13","FY14","FY15","FY13","FY15","FY13","FY14","FY15","FY13","FY14","FY15"),
+                  Region=c(rep("AFRICA",5),rep("ASIA",5),rep("AMERICA",6)),
+                  QST=c(rep("Q2",3),rep("Q5",2),rep("Q2",3),rep("Q5",2),rep("Q2",3),rep("Q5",3)),
+                  Very.Satisfied=runif(16,min = 0, max=1),
+                  Total.Very.Satisfied=floor(runif(16,min=10,max=120)),
+                  Satisfied=runif(16,min = 0, max=1),
+                  Total.Satisfied=floor(runif(16,min=10,max=120)),
+                  Dissatisfied=runif(16,min = 0, max=1),
+                  Total.Dissatisfied=floor(runif(16,min=10,max=120)),
+                  Very.Dissatisfied=runif(16,min = 0, max=1),
+                  Total.Very.Dissatisfied=floor(runif(16,min=10,max=120))
+)
+
+tesdf_out <- testdf %>%
+  gather(key, val, 4:ncol(.)) %>%
+  extract(key, into = c("key1", "Level"), "(Total)?\\.?(.*)") %>%
+  mutate(key1 = replace_na(key1, "Score")) %>%
+  spread(key1, val)
+

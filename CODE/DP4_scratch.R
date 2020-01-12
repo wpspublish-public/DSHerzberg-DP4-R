@@ -123,6 +123,24 @@ scale_CI_lookup <- scale_acr %>%
   bind_cols(scale_CV_lookup, .) %>% 
   select(form:COM, ends_with('CI90'), ends_with('CI95'))
 
+# join this to code above
+out_temp <- scale_CI_lookup %>%
+  # rename SS cols so all cols to be gathered are named with the format
+  # "scaleName_scoreType"
+  rename_at(vars(PHY:COM), ~ paste0(.x,"_SS")) %>% 
+  # gather "scaleName_scoreType" cols into key column, SS and CI values into val
+  # col
+  gather(key, val, 4:ncol(.)) %>%
+  # Now split "scaleName_scoreType" in key col into two cols: scale and type
+  extract(key, into = c("scale", "type"), "([:alpha:]{3})?\\_?(.*)") %>%
+  # spread so that type yields cols of SS, CI90, CI95, and that triplet remains
+  # paired with correct form, agestrat, rawscore, and scale.
+  spread(type, val) %>% 
+  select(scale, agestrat, rawscore, SS, CI90, CI95) %>% 
+  arrange(scale) %>% 
+  mutate(SS = as.numeric(SS))
+
+
 
 # Read in GDS .xlsx, using same general method, but without requiring a function
 GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>% 
