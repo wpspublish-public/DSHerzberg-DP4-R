@@ -45,6 +45,14 @@ scale_lookup <- scale_file_name %>%
   setNames(form) %>% 
   bind_rows(.id = 'form')
 
+# Read in growth score .xlsx
+growth_lookup <- here('INPUT-FILES/OES-TABLES/growth-score-lookup.xlsx') %>% 
+  excel_sheets() %>%
+  set_names() %>%
+  map_df(read_excel,
+         path = here('INPUT-FILES/OES-TABLES/growth-score-lookup.xlsx'),
+         .id = 'form')
+
 # Read in CV .xlsx
 CV_lookup <- here('INPUT-FILES/OES-TABLES/Form-Agestrat-CV.xlsx') %>% 
   excel_sheets() %>%
@@ -171,7 +179,8 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
   mutate(scale = 'GDS') %>% 
   select(scale, form, agestrat, rawscore, SS, CI90, CI95)
 
-
+# stack scale and GDS tables
+scale_GDS_CI_lookup <- bind_rows(scale_CI_lookup, GDS_lookup)
 
 # Assemble OES output table
 scale_GDS_lookup <- scale_lookup %>% 
