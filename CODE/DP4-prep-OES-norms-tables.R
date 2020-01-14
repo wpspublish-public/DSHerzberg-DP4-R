@@ -2,11 +2,14 @@ suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
 
-file_name <- c('scale_lookup_interview',
-               'scale_lookup_parent',
-               'scale_lookup_teacher')
-
 form <- c('interview', 'parent', 'teacher')
+scale_acr <- c('PHY', 'ADP', 'SOC', 'COG', 'COM')
+
+# Create char vec holding names of input .xlsx containing scale lookups.
+# `purrr::map_chr()` returns a char vec. Mapping `paste0()` allows you to paste
+# the names of the three forms into the file name stem, creating charvec with
+# three file names.
+scale_file_name <- map_chr(form, ~ paste0('scale_lookup_', .x))
 
 # read in percentile lookup column
 perc_lookup <- suppressMessages(read_csv(here('INPUT-FILES/Percentile-Lookup-SS.csv')))
@@ -15,12 +18,12 @@ perc_lookup <- suppressMessages(read_csv(here('INPUT-FILES/Percentile-Lookup-SS.
 age_labels <- suppressMessages(read_csv(here('INPUT-FILES/OES-TABLES/OES-age-labels.csv'))) %>%
   mutate(agestrat = str_sub(agestrat, 4))
 
-lookup <- function(x) {
+scale_readin <- function(x) {
   # express the directory path to the input file as a string.
-here(
-  paste0('INPUT-FILES/OES-TABLES/', x, '.xlsx')) %>%
-  assign('path', ., envir = .GlobalEnv)
-
+  here(
+    paste0('INPUT-FILES/OES-TABLES/', x, '.xlsx')) %>%
+    assign('path', ., envir = .GlobalEnv)
+  
   
   # input file is multi-tabbed .xlsx. Tabs contain lookup tables for each
   # agestrat. read input file into a df, stacking tabs on top of one another, and
@@ -31,74 +34,161 @@ here(
     map_df(read_excel,
            path = path,
            .id = 'agestrat') %>% 
-    assign('input_lookup_pre', ., envir = .GlobalEnv)
-  
-# recode agestrat so that it will sort properly
-input_lookup_pre %>%  mutate(agestrat_x = str_sub(agestrat, 4) %>% 
-    str_pad(3, side = 'left', '0')) %>% 
-   select(-agestrat) %>% 
-   rename(agestrat = agestrat_x) %>% 
-  assign('input_lookup', ., envir = .GlobalEnv)
-
-# erstatz GDS lookup
-tribble(
-    ~rawscore, ~GDS,
-    500, 98,
-    501, 99,
-    502, 100,
-    503, 101,
-    504, 102
-  ) %>% 
-    assign('input_GDS', ., envir = .GlobalEnv)
-  
-  # extract agestrat values into df
-  unique(input_lookup$agestrat) %>% 
-    assign('agestrat', ., envir = .GlobalEnv)
-  
-  enframe(agestrat) %>% 
-    select(value) %>% 
-    rename(agestrat = value) %>% 
-    assign('agestrat1', ., envir = .GlobalEnv)
-  
-  # new df that nests input_GDS within values of agestrat, tidyr::crossing is used
-  # because inputs have now common vars
-  agestrat_GDS <- crossing(agestrat1, input_GDS) %>% 
-    assign('agestrat_GDS', ., envir = .GlobalEnv)
-  
-  # Transform input table so that subscales and their associated raw-to-SS lookups
-  # are nested within each value of agestrat.
-  input_lookup %>% 
-    full_join(agestrat_GDS, by = c('agestrat', 'rawscore')) %>% 
-    gather('scale', 'SS', -agestrat, -rawscore) %>%
-    right_join(perc_lookup, by = 'SS') %>% 
-    arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), agestrat) %>% 
-    mutate(descrange = case_when(
-      SS >= 131 ~ 'Well above average',
-      between(SS, 116, 130) ~ 'Above average',
-      between(SS, 85, 115) ~ 'Average',
-      between(SS, 70, 84) ~ 'Below average',
-      SS <= 69 ~ 'Delayed',
-      TRUE ~ NA_character_
-    )) %>% 
-    select(scale, agestrat, rawscore, SS, descrange, Percentile)
+  # recode agestrat so that it will sort properly
+  mutate(agestrat = str_sub(agestrat, 4) %>% 
+                                 str_pad(3, side = 'left', '0')) %>% 
+    assign('input_lookup', ., envir = .GlobalEnv)
 }
 
-lookup_list <- file_name %>% 
-  map(lookup) %>% 
-  setNames(form)
+scale_lookup <- scale_file_name %>% 
+  map(scale_readin) %>% 
+  setNames(form) %>% 
+  bind_rows(.id = 'form')
 
-# use purr::imap() to apply a function to both a list and its index (in a named
-# list the index is the names of the elements)
-lookup_list_mod <- imap(lookup_list, ~.x %>% mutate(form = .y) %>% select(form, everything()))
+# Read in CV .xlsx
+CV_lookup <- here('INPUT-FILES/OES-TABLES/Form-Agestrat-CV.xlsx') %>% 
+  excel_sheets() %>%
+  set_names() %>%
+  map_df(read_excel,
+         path = here('INPUT-FILES/OES-TABLES/Form-Agestrat-CV.xlsx'),
+         .id = 'form') %>% 
+  mutate(agestrat = str_sub(agestrat, 4) %>% 
+           str_pad(3, side = 'left', '0'), 
+         CV_type = str_sub(form, -4),
+         form = tolower(form),
+         form = str_sub(form, 1, -6)) 
+CV_90_lookup <- CV_lookup %>% 
+  filter(CV_type == "CV90") %>% 
+  rename(
+    ADP_CV90 = ADP,
+    COG_CV90 = COG,
+    COM_CV90 = COM,
+    PHY_CV90 = PHY,
+    SOC_CV90 = SOC
+  ) %>%
+  select(-CV_type)
+CV_95_lookup <- CV_lookup %>% 
+  filter(CV_type == "CV95") %>% 
+  rename(
+    ADP_CV95 = ADP,
+    COG_CV95 = COG,
+    COM_CV95 = COM,
+    PHY_CV95 = PHY,
+    SOC_CV95 = SOC
+  ) %>%
+  select(-CV_type)
 
-# give the modified dfs new names, and extract them from the list using
-# base::list2env
-names(lookup_list_mod) <- paste0(names(lookup_list_mod), '_lookup')
-list2env(lookup_list_mod, .GlobalEnv)
+scale_CV_lookup <- list(scale_lookup, CV_90_lookup, CV_95_lookup) %>% 
+  reduce(left_join, by = c('form', 'agestrat'))
 
-all_lookup <- bind_rows(interview_lookup, parent_lookup, teacher_lookup) %>%
-  left_join(age_labels, by = 'agestrat') %>%
-  select(-agestrat) %>%
-  rename(agestrat = OES_label) %>%
-  select(form, scale, agestrat, rawscore, SS, descrange, Percentile)
+scale_CI_lookup <- scale_acr %>%
+  map_dfc(~ scale_CV_lookup %>% 
+            # dplyr::transmute() is similar to mutate(), but it drops the input
+            # columns after creating the new var
+            transmute(
+              # Next four operations lines get upper, lower bounds of CIs as numbers
+              !!str_c(.x, '_CI90_LB_pre') := !!sym(.x) - !!sym(str_c(.x, '_CV90')),
+              !!str_c(.x, '_CI90_UB_pre') := !!sym(.x) + !!sym(str_c(.x, '_CV90')), 
+              !!str_c(.x, '_CI95_LB_pre') := !!sym(.x) - !!sym(str_c(.x, '_CV95')),
+              !!str_c(.x, '_CI95_UB_pre') := !!sym(.x) + !!sym(str_c(.x, '_CV95')), 
+              # Next four operations truncate UB at 160, LB at 40, and coerce
+              # both to character
+              !!str_c(.x, '_CI90_LB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI90_LB_pre')) < 40 ~ 40,
+                TRUE ~ !!sym(str_c(.x, '_CI90_LB_pre'))
+              )),
+              !!str_c(.x, '_CI90_UB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI90_UB_pre')) > 160 ~ 160,
+                TRUE ~ !!sym(str_c(.x, '_CI90_UB_pre'))
+              )),
+              !!str_c(.x, '_CI95_LB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI95_LB_pre')) < 40 ~ 40,
+                TRUE ~ !!sym(str_c(.x, '_CI95_LB_pre'))
+              )),
+              !!str_c(.x, '_CI95_UB') := as.character(case_when(
+                !!sym(str_c(.x, '_CI95_UB_pre')) > 160 ~ 160,
+                TRUE ~ !!sym(str_c(.x, '_CI95_UB_pre'))
+              )),
+              # Next two operations yield the formatted, truncated CIs as strings
+              !!str_c(.x, '_CI90') :=
+                str_c(!!sym(str_c(.x, '_CI90_LB')), !!sym(str_c(.x, '_CI90_UB')), sep = ' - '),
+              !!str_c(.x, '_CI95') :=
+                str_c(!!sym(str_c(.x, '_CI95_LB')), !!sym(str_c(.x, '_CI95_UB')), sep = ' - ')
+            )
+  ) %>%
+  # At this point the object has only the new columns; all input columns have
+  # been dropped by transmute(). Now bind_cols joins the new cols with the
+  # original input set. select() then pares to only those columsn needed in the
+  # final OES output.
+  bind_cols(scale_CV_lookup, .) %>% 
+  select(form:COM, ends_with('CI90'), ends_with('CI95')) %>% 
+  # rename SS cols so all cols to be gathered are named with the format
+  # "scaleName_scoreType"
+  rename_at(vars(PHY:COM), ~ paste0(.x,"_SS")) %>% 
+  # gather "scaleName_scoreType" cols into key column, SS and CI values into val
+  # col
+  gather(key, val, 4:ncol(.)) %>%
+  # Now split "scaleName_scoreType" in key col into two cols: scale and type
+  extract(key, into = c("scale", "type"), "([:alpha:]{3})?\\_?(.*)") %>%
+  # spread so that type yields cols of SS, CI90, CI95, and that triplet remains
+  # paired with correct form, agestrat, rawscore, and scale.
+  spread(type, val) %>% 
+  select(scale, form, agestrat, rawscore, SS, CI90, CI95) %>% 
+  arrange(scale) %>% 
+  mutate(SS = as.numeric(SS))
+
+# Read in GDS .xlsx, using same general method, but without requiring a function
+GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>% 
+  excel_sheets() %>%
+  set_names() %>%
+  map_df(read_excel,
+         path = here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx'),
+         .id = 'form') %>% 
+  # to nest form-rawscore-GDS triplets within values of agestrat, tidyr::crossing is used
+  # because inputs have no common vars
+  crossing(age_labels, .) %>% 
+  filter(!(form == 'teacher' & agestrat %in% c("000", "002", "004", "006", "008", 
+                         "010", "012", "014", "016", "018",
+                         "020", "022"))) %>% 
+  select(form, rawscore, GDS, agestrat) %>% 
+  # add CIs - the CVs are constant across all forms and agestrats
+  mutate(GDS_CI90_LB = case_when(
+    GDS - 9 < 40 ~ 40,
+    TRUE ~ GDS - 9),
+    GDS_CI90_UB = case_when(
+      GDS + 9 > 160 ~ 160,
+      TRUE ~ GDS + 9),
+    GDS_CI95_LB = case_when(
+      GDS - 12 < 40 ~ 40,
+      TRUE ~ GDS - 12),
+    GDS_CI95_UB = case_when(
+      GDS + 12 > 160 ~ 160,
+      TRUE ~ GDS + 12),
+    GDS_CI90 = str_c(as.character(GDS_CI90_LB), as.character(GDS_CI90_UB), sep = ' - '),
+    GDS_CI95 = str_c(as.character(GDS_CI95_LB), as.character(GDS_CI95_UB), sep = ' - ')
+         ) %>% 
+  rename(SS = GDS, CI90 = GDS_CI90, CI95 = GDS_CI95) %>% 
+  mutate(scale = 'GDS') %>% 
+  select(scale, form, agestrat, rawscore, SS, CI90, CI95)
+
+
+
+# Assemble OES output table
+scale_GDS_lookup <- scale_lookup %>% 
+  full_join(GDS_lookup, by = c('agestrat', 'form', 'rawscore')) %>% 
+  gather('scale', 'SS', -agestrat, -rawscore, -form) %>% 
+  # This drops rows that are NA on SS, which shouldn't exist on final output table.
+  drop_na() %>% 
+  left_join(perc_lookup, by = 'SS') %>% 
+  mutate(descrange = case_when(
+    SS >= 131 ~ 'Well above average',
+    between(SS, 116, 130) ~ 'Above average',
+    between(SS, 85, 115) ~ 'Average',
+    between(SS, 70, 84) ~ 'Below average',
+    SS <= 69 ~ 'Delayed',
+    TRUE ~ NA_character_
+  )) %>% 
+  select(scale, form, agestrat, rawscore, SS, descrange, Percentile) %>% 
+  arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), form, agestrat) 
+
 
