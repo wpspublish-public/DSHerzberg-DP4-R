@@ -208,6 +208,10 @@ OES_lookup <- bind_rows(scale_CI_growth_lookup, GDS_lookup) %>%
   select(scale, form, agerange, rawscore, SS, growth, CI90, CI95, descrange, Percentile)
 
 # Write OES lookup table to .csv
+write_csv(OES_lookup, here(
+ 'OUTPUT-FILES/DP4-OES-lookup.csv'
+))
+
   
     
 
