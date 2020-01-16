@@ -51,7 +51,8 @@ growth_lookup <- here('INPUT-FILES/OES-TABLES/growth-score-lookup.xlsx') %>%
   set_names() %>%
   map_df(read_excel,
          path = here('INPUT-FILES/OES-TABLES/growth-score-lookup.xlsx'),
-         .id = 'form')
+         .id = 'form') %>% 
+  rename_at(vars(PHY:COM), ~ paste0(.x,"_G")) 
 
 # Read in CV .xlsx
 CV_lookup <- here('INPUT-FILES/OES-TABLES/Form-Agestrat-CV.xlsx') %>% 
@@ -86,11 +87,12 @@ CV_95_lookup <- CV_lookup %>%
   ) %>%
   select(-CV_type)
 
-scale_CV_lookup <- list(scale_lookup, CV_90_lookup, CV_95_lookup) %>% 
-  reduce(left_join, by = c('form', 'agestrat'))
+scale_CV_growth_lookup <- list(scale_lookup, CV_90_lookup, CV_95_lookup) %>% 
+  reduce(left_join, by = c('form', 'agestrat')) %>% 
+  left_join(growth_lookup, by = c('form', 'rawscore'))
 
-scale_CI_lookup <- scale_acr %>%
-  map_dfc(~ scale_CV_lookup %>% 
+scale_CI_growth_lookup <- scale_acr %>%
+  map_dfc(~ scale_CV_growth_lookup %>% 
             # dplyr::transmute() is similar to mutate(), but it drops the input
             # columns after creating the new var
             transmute(
@@ -128,8 +130,8 @@ scale_CI_lookup <- scale_acr %>%
   # been dropped by transmute(). Now bind_cols joins the new cols with the
   # original input set. select() then pares to only those columsn needed in the
   # final OES output.
-  bind_cols(scale_CV_lookup, .) %>% 
-  select(form:COM, ends_with('CI90'), ends_with('CI95')) %>% 
+  bind_cols(scale_CV_growth_lookup, .) %>% 
+  select(form:COM, ends_with('CI90'), ends_with('CI95'), ends_with('_G')) %>% 
   # rename SS cols so all cols to be gathered are named with the format
   # "scaleName_scoreType"
   rename_at(vars(PHY:COM), ~ paste0(.x,"_SS")) %>% 
@@ -138,14 +140,19 @@ scale_CI_lookup <- scale_acr %>%
   gather(key, val, 4:ncol(.)) %>%
   # Now split "scaleName_scoreType" in key col into two cols: scale and type
   extract(key, into = c("scale", "type"), "([:alpha:]{3})?\\_?(.*)") %>%
-  # spread so that type yields cols of SS, CI90, CI95, and that triplet remains
+  # spread so that type yields cols of SS, G, CI90, CI95, and that quad remains
   # paired with correct form, agestrat, rawscore, and scale.
   spread(type, val) %>% 
-  select(scale, form, agestrat, rawscore, SS, CI90, CI95) %>% 
+  select(scale, form, agestrat, rawscore, SS, G, CI90, CI95) %>% 
+  rename(growth = G) %>% 
   arrange(scale) %>% 
-  mutate(SS = as.numeric(SS))
+  mutate(
+    SS = as.numeric(SS),
+    growth = as.numeric(growth)
+  )
 
-# Read in GDS .xlsx, using same general method, but without requiring a function
+# Read in GDS .xlsx, using same general method as multi-tab .xlsx, but without
+# requiring a function
 GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>% 
   excel_sheets() %>%
   set_names() %>%
@@ -176,18 +183,16 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
     GDS_CI95 = str_c(as.character(GDS_CI95_LB), as.character(GDS_CI95_UB), sep = ' - ')
          ) %>% 
   rename(SS = GDS, CI90 = GDS_CI90, CI95 = GDS_CI95) %>% 
-  mutate(scale = 'GDS') %>% 
-  select(scale, form, agestrat, rawscore, SS, CI90, CI95)
+  mutate(
+    scale = 'GDS',
+    growth = as.numeric(NA)
+         ) %>% 
+  select(scale, form, agestrat, rawscore, SS, growth, CI90, CI95)
 
-# stack scale and GDS tables
-scale_GDS_CI_lookup <- bind_rows(scale_CI_lookup, GDS_lookup)
-
-# Assemble OES output table
-scale_GDS_lookup <- scale_lookup %>% 
-  full_join(GDS_lookup, by = c('agestrat', 'form', 'rawscore')) %>% 
-  gather('scale', 'SS', -agestrat, -rawscore, -form) %>% 
+# Assemble OES output table: first stack scale and GDS tables
+OES_lookup <- bind_rows(scale_CI_growth_lookup, GDS_lookup) %>% 
   # This drops rows that are NA on SS, which shouldn't exist on final output table.
-  drop_na() %>% 
+  drop_na(SS) %>% 
   left_join(perc_lookup, by = 'SS') %>% 
   mutate(descrange = case_when(
     SS >= 131 ~ 'Well above average',
@@ -197,7 +202,13 @@ scale_GDS_lookup <- scale_lookup %>%
     SS <= 69 ~ 'Delayed',
     TRUE ~ NA_character_
   )) %>% 
-  select(scale, form, agestrat, rawscore, SS, descrange, Percentile) %>% 
-  arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), form, agestrat) 
+  arrange(match(scale, c('PHY', 'ADP', 'SOC', 'COG', 'COM', 'GDS')), form, agestrat) %>% 
+  left_join(age_labels, by = 'agestrat') %>% 
+  rename(agerange = OES_label) %>% 
+  select(scale, form, agerange, rawscore, SS, growth, CI90, CI95, descrange, Percentile)
+
+# Write OES lookup table to .csv
+  
+    
 
 
