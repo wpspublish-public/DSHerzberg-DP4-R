@@ -2,6 +2,7 @@ suppressMessages(library(here))
 suppressMessages(library(tidyverse))
 suppressMessages(library(readxl))
 
+# form <- c('interview', 'parent', 'teacher', 'clinician')
 form <- c('interview', 'parent', 'teacher')
 scale_acr <- c('PHY', 'ADP', 'SOC', 'COG', 'COM')
 
@@ -40,10 +41,18 @@ scale_readin <- function(x) {
     assign('input_lookup', ., envir = .GlobalEnv)
 }
 
-scale_lookup <- scale_file_name %>% 
+scale_lookup_pre <- scale_file_name %>% 
   map(scale_readin) %>% 
   setNames(form) %>% 
   bind_rows(.id = 'form')
+
+# add rows for clinician form, with NA for all SS vars
+scale_lookup <- 
+  scale_lookup_pre %>% 
+  filter(form == 'interview') %>% 
+  mutate(form = 'clinician') %>% 
+  mutate_at(vars(PHY:COM), ~ as.numeric(NA)) %>% 
+  bind_rows(scale_lookup_pre, .)
 
 # Read in growth score .xlsx
 growth_lookup <- here('INPUT-FILES/OES-TABLES/growth-score-lookup.xlsx') %>% 
@@ -191,8 +200,8 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
 
 # Assemble OES output table: first stack scale and GDS tables
 OES_lookup <- bind_rows(scale_CI_growth_lookup, GDS_lookup) %>% 
-  # This drops rows that are NA on SS, which shouldn't exist on final output table.
-  drop_na(SS) %>% 
+  # This drops rows that are NA on SS and growth, which shouldn't exist on final output table.
+    filter(!(is.na(SS) & is.na(growth))) %>% 
   left_join(perc_lookup, by = 'SS') %>% 
   mutate(descrange = case_when(
     SS >= 131 ~ 'Well above average',
