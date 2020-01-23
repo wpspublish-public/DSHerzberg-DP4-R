@@ -1,0 +1,52 @@
+---
+title: "Prepare performance-test norms tables for OES"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Overview  
+
+
+The code assumes a typical RStudio project folder hierarchy, with `INPUT-FILES` and `OUTPUT-FILES` folders at the first level.
+
+### Input Files
+
+* single-tab, single-column, join by SS: `Percentile-Lookup-SS.csv` 
+* single-tab, single-column, join by agestrat: `OES-age-labels.csv`
+
+* multi-tab (form), single-column, join by rawscore: `GDS_lookup.xlsx`
+* multi-tab (form), multi-column (scale), join by rawscore: `growth-score-lookup.xlsx`, `ageEquiv-form-lookup.xlsx`
+* multi-tab (form X CI_value), multi-column (scale), join by agestrat: `Form-Agestrat-CV.xlsx`
+
+* multi-file (form), multi-tab (agestrat), multi-column (scale), join by rawscore: `scale_lookup_interview.xlsx`, `scale_lookup_parent.xlsx`, `scale_lookup_teacher.xlsx`
+
+
+Here and throughout, certain token markers are employed to designate user-input values that vary by project:  
+
+* `{TOKEN}`: any value or series of values  
+* `{FILE-PATH}`  
+* `{FILE-NAME}` 
+
+### Multi-file-tab-column lookups
+The set of files `scale_lookup_interview.xlsx`, `scale_lookup_parent.xlsx`, `scale_lookup_teacher.xlsx` presents the most complex case for reading in lookup tables. The task is to lookup `SS`, and the basic operation is the many-to-one correspondence between `rawscore` and `SS`. That lookup correspondence is stratified over three levels:
+
+1. columns (scale)
+2. tabs (agestrat)
+3. files (form)
+
+<br>
+
+
+
+###### VALID CODE TO RUN
+
+```{r XXX, eval=FALSE}
+```
+
+###### COMMENTED SNIPPETS
+
+```{r XXX, echo=4:8, eval=FALSE}
+```
