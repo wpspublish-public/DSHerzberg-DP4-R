@@ -69,7 +69,13 @@ ageEquiv_lookup <- here('INPUT-FILES/OES-TABLES/ageEquiv-form-lookup.xlsx') %>%
   set_names() %>%
   map_df(read_excel,
          path = here('INPUT-FILES/OES-TABLES/ageEquiv-form-lookup.xlsx'),
-         .id = 'form') %>% 
+         .id = 'form') %>%
+  # For some reason, R is appending garbage chars to the end of value '<2:0' on
+  # read-in. Next mutate_at subsets the string to get rid of the garbage chars.
+  mutate_at(vars(PHY:COM), ~ case_when(
+    str_detect(.x, '<') ~ str_sub(.x, 1, 4),
+    TRUE ~ .x
+  )) %>% 
   rename_at(vars(PHY:COM), ~ str_c(.x, '_AE'))
 
 # Read in CV .xlsx
