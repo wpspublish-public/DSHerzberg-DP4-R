@@ -35,9 +35,9 @@ scale_readin <- function(x) {
     map_df(read_excel,
            path = path,
            .id = 'agestrat') %>% 
-  # recode agestrat so that it will sort properly
-  mutate(agestrat = str_sub(agestrat, 4) %>% 
-                                 str_pad(3, side = 'left', '0')) %>% 
+    # recode agestrat so that it will sort properly
+    mutate(agestrat = str_sub(agestrat, 4) %>% 
+             str_pad(3, side = 'left', '0')) %>% 
     assign('input_lookup', ., envir = .GlobalEnv)
 }
 
@@ -188,8 +188,8 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
   # because inputs have no common vars
   crossing(age_labels, .) %>% 
   filter(!(form == 'teacher' & agestrat %in% c("000", "002", "004", "006", "008", 
-                         "010", "012", "014", "016", "018",
-                         "020", "022"))) %>% 
+                                               "010", "012", "014", "016", "018",
+                                               "020", "022"))) %>% 
   select(form, rawscore, GDS, agestrat) %>% 
   # add CIs - the CVs are constant across all forms and agestrats
   mutate(GDS_CI90_LB = case_when(
@@ -206,18 +206,18 @@ GDS_lookup <- here('INPUT-FILES/OES-TABLES/GDS_lookup.xlsx') %>%
       TRUE ~ GDS + 12),
     GDS_CI90 = str_c(as.character(GDS_CI90_LB), as.character(GDS_CI90_UB), sep = ' - '),
     GDS_CI95 = str_c(as.character(GDS_CI95_LB), as.character(GDS_CI95_UB), sep = ' - ')
-         ) %>% 
+  ) %>% 
   rename(SS = GDS, CI90 = GDS_CI90, CI95 = GDS_CI95) %>% 
   mutate(
     scale = 'GDS',
     growth = as.numeric(NA)
-         ) %>% 
+  ) %>% 
   select(scale, form, agestrat, rawscore, SS, growth, CI90, CI95)
 
 # Assemble OES output table: first stack scale and GDS tables
 OES_lookup <- bind_rows(scale_CI_growth_AE_lookup, GDS_lookup) %>% 
   # This drops rows that are NA on SS and growth, which shouldn't exist on final output table.
-    filter(!(is.na(SS) & is.na(growth))) %>% 
+  filter(!(is.na(SS) & is.na(growth))) %>% 
   left_join(perc_lookup, by = 'SS') %>% 
   mutate(descrange = case_when(
     SS >= 131 ~ 'Well above average',
@@ -234,10 +234,10 @@ OES_lookup <- bind_rows(scale_CI_growth_AE_lookup, GDS_lookup) %>%
 
 # Write OES lookup table to .csv
 write_csv(OES_lookup, here(
- 'OUTPUT-FILES/DP4-OES-lookup.csv'
+  'OUTPUT-FILES/DP4-OES-lookup.csv'
 ))
 
-  
-    
+
+
 
 
