@@ -224,6 +224,23 @@ $(document).ready(function () {
 <li>tabs (agestrat)</li>
 <li>files (form)</li>
 </ol>
+<p>The tab labels should express agestrat as a three-digit integer (with leading zeros). The value of this label is the lower-bound of the agestrat, expressed in months. Here are some examples:</p>
+<ul>
+<li>4-6 months = 004</li>
+<li>3:0-3:5 = 036</li>
+<li>16 to 18 years = 192</li>
+</ul>
+<p>Format of CV lookup tables .xlsx</p>
+<ul>
+<li>tab labels = form</li>
+<li>file names: CV90, CV95, etc.</li>
+<li>columns per tab (left to right):
+<ul>
+<li>agestrat (in integer format as above)</li>
+<li>one column per scale, column name is scale acronym plus _CV90 or _CV95 (e.g., ‘COG_CV90’)</li>
+<li>cell values are confidence values (CV)</li>
+</ul></li>
+</ul>
 <div id="look-at-whether-all-inputs-can-be-expressed-as-multi-file-tab-colum-with-consistency-about-which-vars-are-expressed-at-which-levels" class="section level20">
 <p>LOOK at whether all inputs can be expressed as multi-file-tab-colum, with consistency about which vars are expressed at which levels</p>
 <p><br></p>
