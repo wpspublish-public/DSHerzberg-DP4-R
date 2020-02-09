@@ -45,6 +45,12 @@ The tab labels should express agestrat as a three-digit integer (with leading ze
 
 Format of CV lookup tables .xlsx
 
+The lookup stratification over three levels (different from previous example):
+
+1. columns (scale)
+2. tabs (form)
+3. files (CI interval)
+
 * tab labels = form
 * file names: CV90, CV95, etc.
 * columns per tab (left to right):
