@@ -230,7 +230,14 @@ $(document).ready(function () {
 <li>3:0-3:5 = 036</li>
 <li>16 to 18 years = 192</li>
 </ul>
-<p>Format of CV lookup tables .xlsx</p>
+<div id="format-of-cv-lookup-tables-.xlsx" class="section level5">
+<h5>Format of CV lookup tables .xlsx</h5>
+<p>The lookup stratification over three levels (different from previous example):</p>
+<ol style="list-style-type: decimal">
+<li>columns (scale)</li>
+<li>tabs (form)</li>
+<li>files (CI interval)</li>
+</ol>
 <ul>
 <li>tab labels = form</li>
 <li>file names: CV90, CV95, etc.</li>
@@ -239,6 +246,27 @@ $(document).ready(function () {
 <li>agestrat (in integer format as above)</li>
 <li>one column per scale, column name is scale acronym plus _CV90 or _CV95 (e.g., ‘COG_CV90’)</li>
 <li>cell values are confidence values (CV)</li>
+</ul></li>
+</ul>
+</div>
+<div id="format-of-growth-lookup-tables-.xlsx" class="section level5">
+<h5>Format of growth lookup tables .xlsx</h5>
+<ul>
+<li>example of var that does not differ by agestrat</li>
+</ul>
+<p>The lookup stratification over two levels (different from previous example):</p>
+<ol style="list-style-type: decimal">
+<li>columns (scale)</li>
+<li>tabs (form)</li>
+</ol>
+<ul>
+<li>tab labels = form</li>
+<li>file name: growth.xlsx</li>
+<li>columns per tab (left to right):
+<ul>
+<li>rawscore</li>
+<li>one column per scale, column name is scale acronym plus _G (e.g., ‘COG_G’)</li>
+<li>cell values are growth scores</li>
 </ul></li>
 </ul>
 <div id="look-at-whether-all-inputs-can-be-expressed-as-multi-file-tab-colum-with-consistency-about-which-vars-are-expressed-at-which-levels" class="section level20">
@@ -250,6 +278,7 @@ $(document).ready(function () {
 </div>
 <div id="commented-snippets" class="section level6">
 <h6>COMMENTED SNIPPETS</h6>
+</div>
 </div>
 </div>
 

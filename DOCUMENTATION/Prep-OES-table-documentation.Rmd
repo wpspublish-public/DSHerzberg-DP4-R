@@ -43,7 +43,7 @@ The tab labels should express agestrat as a three-digit integer (with leading ze
 * 3:0-3:5 = 036
 * 16 to 18 years = 192
 
-Format of CV lookup tables .xlsx
+##### Format of CV lookup tables .xlsx
 
 The lookup stratification over three levels (different from previous example):
 
@@ -57,6 +57,21 @@ The lookup stratification over three levels (different from previous example):
       + agestrat (in integer format as above)
       + one column per scale, column name is scale acronym plus _CV90 or _CV95 (e.g., 'COG_CV90')
       + cell values are confidence values (CV)
+
+##### Format of growth lookup tables .xlsx
+* example of var that does not differ by agestrat
+
+The lookup stratification over two levels (different from previous example):
+
+1. columns (scale)
+2. tabs (form)
+
+* tab labels = form
+* file name: growth.xlsx
+* columns per tab (left to right):
+      + rawscore
+      + one column per scale, column name is scale acronym plus _G (e.g., 'COG_G')
+      + cell values are growth scores
   
 
 #################### LOOK at whether all inputs can be expressed as multi-file-tab-colum, with consistency about which vars are expressed at which levels
