@@ -163,7 +163,7 @@ scale_CI_growth_AE_lookup <- scale_acr %>%
   # col
   gather(key, val, 4:ncol(.)) %>%
   # Now split "scaleName_scoreType" in key col into two cols: scale and type
-  extract(key, into = c("scale", "type"), "([:alpha:]{3})?\\_?(.*)") %>%
+  extract(key, into = c("scale", "type"), "([[:alpha:]]{3})?\\_?(.*)") %>%
   # spread so that type yields cols of SS, G, CI90, CI95, and that quad remains
   # paired with correct form, agestrat, rawscore, and scale.
   spread(type, val) %>% 
